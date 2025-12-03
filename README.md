@@ -11,6 +11,7 @@
 [![Framework](https://img.shields.io/badge/.NET-8.0-512BD4.svg)](https://dotnet.microsoft.com/)
 [![Driver](https://img.shields.io/badge/Dokan-v2.0.6-orange.svg)](https://dokan-dev.github.io/)
 [![Status](https://img.shields.io/badge/Estado-Estable%20v5.0-success.svg)]()
+[![Languages](https://img.shields.io/badge/Idiomas-ES_|_EN_|_PT_|_RU_|_CN-blueviolet)]()
 
 <br>
 
@@ -170,6 +171,7 @@ Descarga el último archivo `installer.exe` directamente desde la página de lan
 - **Bloqueo Automático:** Las bóvedas se desmontan automáticamente al cerrar la aplicación.
 - **System Tray:** Funciona silenciosamente en segundo plano con notificaciones no intrusivas.
 - **Fail-Safe:** Sistema transaccional de base de datos para prevenir corrupción durante cortes de energía.
+- **Soporte Multi-Lenguaje:** Interfaz traducida nativamente a **Español 🇪🇸, Inglés 🇺🇸, Portugués 🇧🇷, Ruso 🇷🇺 y Chino 🇨🇳**.
 
 ### Próximas Funciones:
 
