@@ -108,18 +108,18 @@ Explora cada rincón de la interfaz **Red Security**:
                 <img src="assets/screenshot_login.png" width="100%" alt="Login">
             </td>
             <td align="center" width="50%">
-                <strong>Dashboard Principal</strong><br>
-                <img src="assets/screenshot_main.png" width="100%" alt="Main UI">
+                <strong>Registro Seguro</strong><br>
+                <img src="assets/screenshot_registro.png" width="100%" alt="Main UI">
             </td>
         </tr>
         <tr>
+            td align="center" width="50%">
+                <strong>Dashboard Principal</strong><br>
+                <img src="assets/screenshot_main.png" width="100%" alt="Main UI">
+            </td>
             <td align="center">
                 <strong>Explorador Virtual (M:)</strong><br>
                 <img src="assets/screenshot_explorer.png" width="100%" alt="Virtual Drive">
-            </td>
-            <td align="center">
-                <strong>Configuración y Ajustes</strong><br>
-                <img src="assets/screenshot_config.png" width="100%" alt="Settings">
             </td>
         </tr>
         <tr>
@@ -136,6 +136,10 @@ Explora cada rincón de la interfaz **Red Security**:
             <td colspan="2" align="center">
                 <strong>Modo Sigiloso (System Tray)</strong><br>
                 <img src="assets/screenshot_tray.png" width="400" alt="Tray">
+            </td>
+                        <td align="center">
+                <strong>Configuración y Ajustes</strong><br>
+                <img src="assets/screenshot_config.png" width="100%" alt="Settings">
             </td>
         </tr>
     </table>
