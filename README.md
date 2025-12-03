@@ -147,6 +147,16 @@ Este proyecto está construido utilizando tecnologías .NET de vanguardia:
 4.  Inicia **FolderLocker** desde tu escritorio.
 
 ---
+## `>_` ❓ Solución de Problemas (FAQ)
+*P: Veo archivos con extensión .lock y nombres raros en mi disco físico (C:). ¿Qué hago?*
+R: ¡No los toques! Esos son tus archivos encriptados y ofuscados por la tecnología Stealth. Para verlos y editarlos correctamente, abre la aplicación, selecciona la carpeta y pulsa "Abrir Bóveda". Se montarán en la unidad virtual M: con sus nombres originales.
+
+*P: Olvidé mi contraseña maestra.*
+R: Usa el botón "¿Olvidaste la clave?" en la pantalla de login e introduce tu código REC-XXXX que se te proporcionó al crear la cuenta. Si perdiste tanto la contraseña como el código, la encriptación AES-256 hace imposible recuperar los datos.
+
+*P: El programa no inicia o da error al montar.*
+R: Asegúrate de que no has desinstalado el controlador Dokan Library de tu Panel de Control. FolderLocker lo necesita para crear el disco virtual.
+---
 
 ## `>_` Contribuciones
 
@@ -164,6 +174,9 @@ Este proyecto está construido utilizando tecnologías .NET de vanguardia:
 - 👨‍💻 Desarrollado con ❤️ y mucho ☕ por **David Platas**
 - 🛡️ Impulsado por el proyecto **Dokan Library**.
 - 🎨 Iconos de UI por **Icons8** y **Flaticon**.
+
+### `>_` ⚖️ Aviso Legal (Disclaimer)
+Este software se proporciona "tal cual", sin garantía de ningún tipo, expresa o implícita. El desarrollador no se hace responsable de ninguna pérdida de datos, corrupción de archivos o daños derivados del uso (o mal uso) de esta herramienta. La seguridad de tus datos es tu responsabilidad: haz copias de seguridad de tu código de recuperación y no manipules los archivos ocultos manualmente.
 
 <div align="center">
   <a href="https://github.com/DeathSilencer">
