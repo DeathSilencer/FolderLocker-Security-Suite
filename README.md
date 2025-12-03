@@ -4,17 +4,17 @@
 
 # `>_` FolderLocker Security Suite
 
-**Enterprise-grade "Zero-Knowledge" encryption suite for Windows. Virtualize, lock, and vanish your files.**
+**Suite de Seguridad "Zero-Knowledge" de Grado Empresarial para Windows. Virtualiza, bloquea y desaparece tus archivos.**
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6.svg)](https://www.microsoft.com/)
 [![Framework](https://img.shields.io/badge/.NET-8.0-512BD4.svg)](https://dotnet.microsoft.com/)
 [![Driver](https://img.shields.io/badge/Dokan-v2.0.6-orange.svg)](https://dokan-dev.github.io/)
-[![Status](https://img.shields.io/badge/Status-Stable%20v5.0-success.svg)]()
+[![Status](https://img.shields.io/badge/Estado-Estable%20v5.0-success.svg)]()
 
 <br>
 
-| 🛡️ | **New Release v5.0:** | *Now featuring Stealth Architecture & Dokan Driver Integration.* <br> Download the installer below! |
+| 🛡️ | **Nueva Versión v5.0:** | *Ahora con Arquitectura "Stealth" e Integración Nativa con Dokan Driver.* <br> ¡Descarga el instalador abajo! |
 |--|-------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------|
 
 <br>
@@ -27,62 +27,62 @@
 ---
 
 <details>
-    <summary>Expand Table of Contents</summary>
+    <summary>Desplegar Tabla de Contenidos</summary>
     
 <br>
         
-- [Purpose](#-purpose)
-- [Screenshots](#--screenshots)
-- [Download](#--download)
-- [Features](#--features)
-- [Architecture](#-architecture)
-- [Installation](#-installation)
-- [Contributions](#-contributions)
-- [Credits](#--credits)
+- [Propósito](#-propósito)
+- [Capturas de Pantalla](#-capturas-de-pantalla)
+- [Descarga](#-descarga)
+- [Características](#-características)
+- [Arquitectura](#-arquitectura)
+- [Instalación](#-instalación)
+- [Contribuciones](#-contribuciones)
+- [Créditos](#-créditos)
 
 </details>
 
 ---
 
-## `>_` Purpose
+## `>_` Propósito
 
-FolderLocker is developed with the goal of providing a powerful, **privacy-focused tool** for Windows users. Unlike traditional folder hiders, this suite uses a **Virtual File System Driver (Dokan)** to encrypt data on-the-fly.
+FolderLocker ha sido desarrollado con el objetivo de proporcionar una herramienta potente y centrada en la **privacidad absoluta** para usuarios de Windows. A diferencia de los ocultadores de carpetas tradicionales (que solo cambian atributos), esta suite utiliza un **Driver de Sistema de Archivos Virtual (Dokan)** para encriptar los datos al vuelo.
 
-This app is intended for **absolute privacy**. If the vault is not mounted, your files are mathematically inaccessible and invisible on the physical disk.
+Esta aplicación está diseñada para **seguridad real**. Si la bóveda no está montada, tus archivos son matemáticamente inaccesibles e invisibles en el disco físico.
 
-**Key Use Cases:**
-- **Personal Privacy:** Secure photos, documents, and videos away from prying eyes.
-- **Data Transport:** Create portable vaults that can only be opened with your credentials.
-- **Theft Protection:** Even if your drive is stolen, the file names and contents remain obfuscated (GUIDs).
+**Casos de Uso Principales:**
+- **Privacidad Personal:** Mantén fotos, documentos y videos lejos de miradas indiscretas.
+- **Transporte de Datos:** Crea bóvedas portátiles que solo se pueden abrir con tus credenciales.
+- **Protección Antirrobo:** Incluso si roban tu disco duro, los nombres de archivos y contenidos permanecen ofuscados (GUIDs ilegibles).
 
 > [!Caution]
-> **Loss of Data Disclaimer:** <br>
-> FolderLocker uses AES-256 and SHA-256 encryption. If you lose your Master Password AND your Recovery Code, **your data is mathematically lost forever**. There are no backdoors.
+> **Aviso de Pérdida de Datos:** <br>
+> FolderLocker utiliza encriptación AES-256 y SHA-256 de grado militar. Si pierdes tu Contraseña Maestra Y tu Código de Recuperación, **tus datos se perderán matemáticamente para siempre**. No existen "puertas traseras" (backdoors).
 
 ---
 
-## `>_` 📱 Screenshots
+## `>_` 📱 Capturas de Pantalla
 
 <div align="center">
     <br>
     <table>
         <tr>
             <td align="center">
-                <strong>Secure Virtual Explorer (M:)</strong><br>
+                <strong>Explorador Virtual Seguro (M:)</strong><br>
                 <img src="assets/screenshot_main.png" width="450" alt="Main Explorer">
             </td>
             <td align="center">
-                <strong>Access Control</strong><br>
+                <strong>Control de Acceso</strong><br>
                 <img src="assets/screenshot_login.png" width="350" alt="Login Error">
             </td>
         </tr>
         <tr>
             <td align="center">
-                <strong>Process Visualization</strong><br>
+                <strong>Visualización de Procesos</strong><br>
                 <img src="assets/screenshot_loading.png" width="450" alt="Loading Bar">
             </td>
             <td align="center">
-                <strong>Stealth Tray Notification</strong><br>
+                <strong>Notificación Sigilosa</strong><br>
                 <img src="assets/screenshot_tray.png" width="350" alt="Tray Notification">
             </td>
         </tr>
@@ -92,81 +92,81 @@ This app is intended for **absolute privacy**. If the vault is not mounted, your
 
 ---
 
-## `>_` ⬇️ Download
+## `>_` ⬇️ Descarga
 
-Download the latest `installer.exe` file directly from the [releases page](https://github.com/DeathSilencer/FolderLocker-Security-Suite/releases).
+Descarga el último archivo `installer.exe` directamente desde la página de lanzamientos (Releases):
 
 <div align="center">
   <a href="https://github.com/DeathSilencer/FolderLocker-Security-Suite/releases/latest">
-    <img src="https://img.shields.io/badge/Download_for_Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" height="60" />
+    <img src="https://img.shields.io/badge/Descargar_para_Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" height="60" />
   </a>
 </div>
 
 ---
 
-## `>_` Features:
+## `>_` Características
 
-- **Stealth Architecture:** File names are obfuscated on the physical disk (random GUIDs).
-- **On-The-Fly Encryption:** Files are decrypted in RAM only when requested. Nothing is stored plain-text.
-- **Modern UI:** Clean, "Red Security" theme inspired by modern dashboard designs.
-- **Virtual Drive (M:):** Mounts your vault as a real removable drive in "This PC".
-- **Multi-User Database:** Encrypted `users.db` supporting multiple isolated accounts.
-- **Smart Drag & Drop:** Secure folders instantly by dragging them into the app.
-- **Auto-Lock:** Vaults unmount automatically when the application closes.
-- **System Tray:** Runs silently in the background with non-intrusive notifications.
-- **Fail-Safe:** Transactional database updates to prevent corruption during power loss.
+- **Arquitectura "Stealth":** Los nombres de archivo se ofuscan en el disco físico (se convierten en GUIDs aleatorios).
+- **Encriptación On-The-Fly:** Los archivos se descifran en la memoria RAM solo cuando los solicitas. Nada se guarda en texto plano.
+- **Interfaz Moderna UI:** Diseño limpio "Red Security" inspirado en dashboards de ciberseguridad, sin bordes.
+- **Unidad Virtual (M:):** Monta tu bóveda como una unidad extraíble real en "Este Equipo".
+- **Base de Datos Multi-Usuario:** Archivo `users.db` encriptado que soporta múltiples cuentas aisladas en la misma PC.
+- **Smart Drag & Drop:** Protege carpetas al instante simplemente arrastrándolas a la aplicación.
+- **Bloqueo Automático:** Las bóvedas se desmontan automáticamente al cerrar la aplicación.
+- **System Tray:** Funciona silenciosamente en segundo plano con notificaciones no intrusivas.
+- **Fail-Safe:** Sistema transaccional de base de datos para prevenir corrupción durante cortes de energía.
 
-## `>_` Upcoming Features:
+### Próximas Funciones:
 
-- **Cloud Sync:** Encrypted auto-upload to Google Drive / OneDrive.
-- **Biometric Login:** Integration with Windows Hello (Fingerprint/Face).
-- **Panic Button:** Global hotkey to instantly unmount all drives.
-- **Portable Mode:** Run directly from a USB stick without installation.
+- **Sincronización en Nube:** Auto-subida encriptada a Google Drive / OneDrive.
+- **Login Biométrico:** Integración con Windows Hello (Huella/Rostro).
+- **Botón de Pánico:** Atajo de teclado global para desmontar todo instantáneamente.
+- **Modo Portable:** Ejecutar directamente desde una USB sin instalación.
 
 ---
 
-## `>_` Architecture
+## `>_` Arquitectura
 
-This project is built using cutting-edge .NET technologies:
+Este proyecto está construido utilizando tecnologías .NET de vanguardia:
 
-| Component | Tech Stack | Description |
+| Componente | Stack Tecnológico | Descripción |
 | :--- | :--- | :--- |
-| **Core** | C# .NET 8.0 | High-performance desktop framework. |
-| **Kernel** | DokanNet 2.0.6 | User-mode file system driver wrapper. |
-| **Crypto** | AES + SHA256 | Military-grade hashing and stream encryption. |
-| **Data** | JSON + Obfuscation | Secure local storage for user profiles. |
+| **Core** | C# .NET 8.0 | Framework de escritorio de alto rendimiento. |
+| **Kernel** | DokanNet 2.0.6 | Wrapper para el driver de sistema de archivos en modo usuario. |
+| **Criptografía** | AES + SHA256 | Hashing con "Salt" y encriptación de flujo (Stream Cipher). |
+| **Datos** | JSON + Ofuscación | Almacenamiento local seguro para perfiles de usuario. |
 
 ---
 
-## `>_` Installation
+## `>_` Instalación
 
-1.  Download `FolderLocker_Setup.exe`.
-2.  Run the installer.
-    * *Note:* It will automatically detect if you need the **Dokan Driver**. If missing, it will install it for you silently.
-3.  Restart your PC (if drivers were installed).
-4.  Launch **FolderLocker** from your desktop.
-
----
-
-## `>_` Contributions
-
-We welcome contributions! Whether it's bug reports or feature suggestions.
-
-### `>_` How to Contribute
-1. **Check Issues**: Browse the issues to see where you can help.
-2. **Fork the Repo**: Fork the repository to make your changes.
-3. **Submit a PR**: Create a pull request with a description.
+1.  Descarga `FolderLocker_Setup.exe`.
+2.  Ejecuta el instalador.
+    * *Nota:* El instalador detectará automáticamente si necesitas el **Driver Dokan**. Si te falta, lo instalará por ti silenciosamente.
+3.  Reinicia tu PC (si se instalaron los drivers por primera vez).
+4.  Inicia **FolderLocker** desde tu escritorio.
 
 ---
 
-### `>_` 🙌 Credits & Developer
+## `>_` Contribuciones
 
-- 👨‍💻 Developed with ❤️ by **David Platas**
-- 🛡️ Powered by the **Dokan Library** project.
-- 🎨 UI Icons by **Icons8** & **Flaticon**.
+¡Las contribuciones son bienvenidas! Ya sea reportando bugs o sugiriendo nuevas funciones.
+
+### `>_` Cómo Contribuir
+1. **Revisar Issues**: Busca en los problemas abiertos para ver dónde puedes ayudar.
+2. **Fork del Repo**: Haz un fork del repositorio para realizar tus cambios.
+3. **Enviar un PR**: Crea un Pull Request con una descripción clara.
+
+---
+
+### `>_` 🙌 Créditos y Desarrollador
+
+- 👨‍💻 Desarrollado con ❤️ y mucho ☕ por **David Platas**
+- 🛡️ Impulsado por el proyecto **Dokan Library**.
+- 🎨 Iconos de UI por **Icons8** y **Flaticon**.
 
 <div align="center">
   <a href="https://github.com/DeathSilencer">
-    <img src="https://img.shields.io/badge/GitHub-Profile-black?style=for-the-badge&logo=github" />
+    <img src="https://img.shields.io/badge/Perfil_de_GitHub-black?style=for-the-badge&logo=github" />
   </a>
 </div>
