@@ -84,7 +84,7 @@ Esta aplicación está diseñada para **seguridad real**. Si la bóveda no está
   <br>
   
   <details>
-    <summary><strong>Ver más demostraciones (Desencriptar, Configuración)</strong></summary>
+    <summary><strong>Ver más demostraciones (Desencriptar)</strong></summary>
     <br>
     <div align="center">
         <strong>🔓 Proceso de Restauración</strong><br>
