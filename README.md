@@ -61,35 +61,86 @@ Esta aplicación está diseñada para **seguridad real**. Si la bóveda no está
 
 ---
 
-## `>_` 📱 Capturas de Pantalla
+## `>_` 🎥 Demos en Vivo
+
+¡Mira FolderLocker en acción!
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <strong>🔒 Protección Instantánea</strong><br>
+        <em>Arrastrar, soltar y bloquear en segundos.</em><br><br>
+        <img src="assets/demo_lock.gif" width="100%" alt="Demo Locking">
+      </td>
+      <td align="center">
+        <strong>📂 Montaje de Unidad Virtual</strong><br>
+        <em>Acceso transparente a archivos encriptados.</em><br><br>
+        <img src="assets/demo_mount.gif" width="100%" alt="Demo Mounting">
+      </td>
+    </tr>
+  </table>
+  
+  <br>
+  
+  <details>
+    <summary><strong>Ver más demostraciones (Desencriptar, Configuración)</strong></summary>
+    <br>
+    <div align="center">
+        <strong>🔓 Proceso de Restauración</strong><br>
+        <img src="assets/demo_unlock.gif" width="600" alt="Demo Unlock">
+    </div>
+  </details>
+</div>
+
+---
+
+## `>_` 📱 Galería de Pantallas
+
+Explora cada rincón de la interfaz **Red Security**:
 
 <div align="center">
     <br>
     <table>
         <tr>
-            <td align="center">
-                <strong>Explorador Virtual Seguro (M:)</strong><br>
-                <img src="assets/screenshot_main.png" width="450" alt="Main Explorer">
+            <td align="center" width="50%">
+                <strong>Inicio de Sesión Seguro</strong><br>
+                <img src="assets/screenshot_login.png" width="100%" alt="Login">
             </td>
-            <td align="center">
-                <strong>Control de Acceso</strong><br>
-                <img src="assets/screenshot_login.png" width="350" alt="Login Error">
+            <td align="center" width="50%">
+                <strong>Dashboard Principal</strong><br>
+                <img src="assets/screenshot_main.png" width="100%" alt="Main UI">
             </td>
         </tr>
         <tr>
             <td align="center">
-                <strong>Visualización de Procesos</strong><br>
-                <img src="assets/screenshot_loading.png" width="450" alt="Loading Bar">
+                <strong>Explorador Virtual (M:)</strong><br>
+                <img src="assets/screenshot_explorer.png" width="100%" alt="Virtual Drive">
             </td>
             <td align="center">
-                <strong>Notificación Sigilosa</strong><br>
-                <img src="assets/screenshot_tray.png" width="350" alt="Tray Notification">
+                <strong>Configuración y Ajustes</strong><br>
+                <img src="assets/screenshot_config.png" width="100%" alt="Settings">
+            </td>
+        </tr>
+        <tr>
+            <td align="center">
+                <strong>Procesamiento en Tiempo Real</strong><br>
+                <img src="assets/screenshot_loading.png" width="100%" alt="Loading">
+            </td>
+            <td align="center">
+                <strong>Manual de Usuario Integrado</strong><br>
+                <img src="assets/screenshot_manual.png" width="100%" alt="User Manual">
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2" align="center">
+                <strong>Modo Sigiloso (System Tray)</strong><br>
+                <img src="assets/screenshot_tray.png" width="400" alt="Tray">
             </td>
         </tr>
     </table>
     <br>
 </div>
-
 ---
 
 ## `>_` ⬇️ Descarga
