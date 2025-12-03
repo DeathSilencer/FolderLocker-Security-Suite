@@ -147,39 +147,48 @@ Este proyecto está construido utilizando tecnologías .NET de vanguardia:
 4.  Inicia **FolderLocker** desde tu escritorio.
 
 ---
+
 ## `>_` ❓ Solución de Problemas (FAQ)
-*P: Veo archivos con extensión .lock y nombres raros en mi disco físico (C:). ¿Qué hago?*
-R: ¡No los toques! Esos son tus archivos encriptados y ofuscados por la tecnología Stealth. Para verlos y editarlos correctamente, abre la aplicación, selecciona la carpeta y pulsa "Abrir Bóveda". Se montarán en la unidad virtual M: con sus nombres originales.
 
-*P: Olvidé mi contraseña maestra.*
-R: Usa el botón "¿Olvidaste la clave?" en la pantalla de login e introduce tu código REC-XXXX que se te proporcionó al crear la cuenta. Si perdiste tanto la contraseña como el código, la encriptación AES-256 hace imposible recuperar los datos.
+**P: Veo archivos con extensión `.lock` y nombres raros en mi disco físico (C:). ¿Qué hago?**
+> **R:** **¡No los toques ni los borres!** Esos son tus archivos protegidos por la tecnología *Stealth*. Para verlos y editarlos correctamente, abre FolderLocker, selecciona la carpeta y pulsa **"Abrir Bóveda"**. Se montarán automáticamente en la unidad virtual `M:` con sus nombres y formatos originales.
 
-*P: El programa no inicia o da error al montar.*
-R: Asegúrate de que no has desinstalado el controlador Dokan Library de tu Panel de Control. FolderLocker lo necesita para crear el disco virtual.
+**P: Olvidé mi contraseña maestra.**
+> **R:** Utiliza el botón *"¿Olvidaste la clave?"* en la pantalla de inicio e introduce tu código `REC-XXXX` que se generó al crear la cuenta. **Nota Importante:** Si pierdes tanto la contraseña como el código de recuperación, la encriptación AES-256 hace matemáticamente imposible recuperar los datos.
+
+**P: El programa no inicia o da error al montar la unidad.**
+> **R:** Asegúrate de que no hayas desinstalado el controlador **Dokan Library** (o Dokan file system driver) desde el Panel de Control. FolderLocker necesita este componente esencial para virtualizar el disco encriptado.
+
 ---
 
 ## `>_` Contribuciones
 
-¡Las contribuciones son bienvenidas! Ya sea reportando bugs o sugiriendo nuevas funciones.
+¡Las contribuciones son bienvenidas! Ya sea reportando bugs, mejorando la documentación o sugiriendo nuevas funciones.
 
 ### `>_` Cómo Contribuir
-1. **Revisar Issues**: Busca en los problemas abiertos para ver dónde puedes ayudar.
-2. **Fork del Repo**: Haz un fork del repositorio para realizar tus cambios.
-3. **Enviar un PR**: Crea un Pull Request con una descripción clara.
+1. **Revisar Issues**: Busca en los [problemas abiertos](https://github.com/DeathSilencer/FolderLocker-Security-Suite/issues) para ver dónde puedes ayudar.
+2. **Fork del Repo**: Haz un "Fork" del repositorio para tener tu propia copia y realizar cambios.
+3. **Enviar un PR**: Crea un *Pull Request* con una descripción clara de tus mejoras.
 
 ---
 
-### `>_` 🙌 Créditos y Desarrollador
+## `>_` 🙌 Créditos y Desarrollador
 
 - 👨‍💻 Desarrollado con ❤️ y mucho ☕ por **David Platas**
 - 🛡️ Impulsado por el proyecto **Dokan Library**.
 - 🎨 Iconos de UI por **Icons8** y **Flaticon**.
-
-### `>_` ⚖️ Aviso Legal (Disclaimer)
-Este software se proporciona "tal cual", sin garantía de ningún tipo, expresa o implícita. El desarrollador no se hace responsable de ninguna pérdida de datos, corrupción de archivos o daños derivados del uso (o mal uso) de esta herramienta. La seguridad de tus datos es tu responsabilidad: haz copias de seguridad de tu código de recuperación y no manipules los archivos ocultos manualmente.
 
 <div align="center">
   <a href="https://github.com/DeathSilencer">
     <img src="https://img.shields.io/badge/Perfil_de_GitHub-black?style=for-the-badge&logo=github" />
   </a>
 </div>
+
+<br>
+
+### `>_` ⚖️ Aviso Legal (Disclaimer)
+
+> [!Warning]
+> **Renuncia de Responsabilidad:** <br>
+> Este software se proporciona "tal cual", sin garantía de ningún tipo, expresa o implícita. El desarrollador no se hace responsable de ninguna pérdida de datos, corrupción de archivos o daños derivados del uso (o mal uso) de esta herramienta. **La seguridad de tus datos es tu responsabilidad:** realiza copias de seguridad de tu Código de Recuperación y nunca manipules los archivos ocultos manualmente fuera de la aplicación.
+> 
