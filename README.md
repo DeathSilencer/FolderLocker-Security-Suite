@@ -108,36 +108,38 @@ Explora cada rincón de la interfaz **Red Security**:
                 <img src="assets/screenshot_login.png" width="100%" alt="Login">
             </td>
             <td align="center" width="50%">
-                <strong>Registro Seguro</strong><br>
-                <img src="assets/screenshot_registro.png" width="100%" alt="Main UI">
+                <strong>Registro de Usuario</strong><br>
+                <img src="assets/screenshot_registro.png" width="100%" alt="Registro">
             </td>
         </tr>
+        
         <tr>
-            td align="center" width="50%">
-                <strong>Dashboard Principal</strong><br>
+            <td align="center" width="50%"> <strong>Dashboard Principal</strong><br>
                 <img src="assets/screenshot_main.png" width="100%" alt="Main UI">
             </td>
-            <td align="center">
+            <td align="center" width="50%">
                 <strong>Explorador Virtual (M:)</strong><br>
                 <img src="assets/screenshot_explorer.png" width="100%" alt="Virtual Drive">
             </td>
         </tr>
+
         <tr>
-            <td align="center">
+            <td align="center" width="50%">
                 <strong>Procesamiento en Tiempo Real</strong><br>
                 <img src="assets/screenshot_loading.png" width="100%" alt="Loading">
             </td>
-            <td align="center">
+            <td align="center" width="50%">
                 <strong>Manual de Usuario Integrado</strong><br>
                 <img src="assets/screenshot_manual.png" width="100%" alt="User Manual">
             </td>
         </tr>
+
         <tr>
-            <td colspan="2" align="center">
+            <td align="center" width="50%">
                 <strong>Modo Sigiloso (System Tray)</strong><br>
                 <img src="assets/screenshot_tray.png" width="400" alt="Tray">
             </td>
-                        <td align="center">
+            <td align="center" width="50%">
                 <strong>Configuración y Ajustes</strong><br>
                 <img src="assets/screenshot_config.png" width="100%" alt="Settings">
             </td>
@@ -146,6 +148,7 @@ Explora cada rincón de la interfaz **Red Security**:
     <br>
 </div>
 ---
+
 
 ## `>_` ⬇️ Descarga
 
