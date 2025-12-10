@@ -15,8 +15,10 @@
 
 <br>
 
-| 🛡️ | **Nueva Versión v5.0:** | *Ahora con Arquitectura "Stealth" e Integración Nativa con Dokan Driver.* <br> ¡Descarga el instalador abajo! |
-|--|-------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 🛡️ | **Estado** | **Descripción y Novedades** |
+| :---: | :--- | :--- |
+| **v5.1** | 🚀 **Nueva** | *Ahora con "Atomic Locking" (Blindaje contra Apagones).* <br> **¡Descarga la actualización abajo!** <br><br> <details><summary><strong>✨ Clic para ver Novedades v5.1</strong></summary><br>Esta actualización introduce un blindaje total contra fallos de energía:<br><br><b>🛡️ Protección "Atomic Locking"</b><ul><li><b>Cifrado a Prueba de Apagones:</b> Usa archivos temporales (.tmp). El original no se toca hasta que el nuevo es 100% seguro.</li><li><b>Auto-Limpieza:</b> Si se va la luz, al reiniciar, el sistema elimina los archivos corruptos automáticamente.</li><li><b>Filtro de Inocencia:</b> Evita dañar archivos sanos al desencriptar tras un fallo.</li></ul><b>🔧 Correcciones</b><ul><li>Solucionado conflicto de ambigüedad en <i>System.IO.FileAccess</i>.</li><li>Ventanas emergentes centradas (Sticky Popups) y notificaciones garantizadas.</li></ul></details> |
+| **v5.0** | ✅ **Estable** | *Arquitectura "Stealth" e Integración Nativa con Dokan Driver.* |
 
 <br>
 </div>
@@ -32,14 +34,21 @@
     
 <br>
         
-- [Propósito](#-propósito)
-- [Capturas de Pantalla](#-capturas-de-pantalla)
-- [Descarga](#-descarga)
-- [Características](#-características)
-- [Arquitectura](#-arquitectura)
-- [Instalación](#-instalación)
-- [Contribuciones](#-contribuciones)
-- [Créditos](#-créditos)
+- [`>_` FolderLocker Security Suite](#_-folderlocker-security-suite)
+  - [`>_` Propósito](#_-propósito)
+  - [`>_` 🎥 Demos en Vivo](#_--demos-en-vivo)
+  - [`>_` 📱 Galería de Pantallas](#_--galería-de-pantallas)
+  - [](#)
+  - [`>_` ⬇️ Descarga](#_-️-descarga)
+  - [`>_` Características](#_-características)
+    - [Próximas Funciones:](#próximas-funciones)
+  - [`>_` Arquitectura](#_-arquitectura)
+  - [`>_` Instalación](#_-instalación)
+  - [`>_` ❓ Solución de Problemas (FAQ)](#_--solución-de-problemas-faq)
+  - [`>_` Contribuciones](#_-contribuciones)
+    - [`>_` Cómo Contribuir](#_-cómo-contribuir)
+  - [`>_` 🙌 Créditos y Desarrollador](#_--créditos-y-desarrollador)
+    - [`>_` ⚖️ Aviso Legal (Disclaimer)](#_-️-aviso-legal-disclaimer)
 
 </details>
 
