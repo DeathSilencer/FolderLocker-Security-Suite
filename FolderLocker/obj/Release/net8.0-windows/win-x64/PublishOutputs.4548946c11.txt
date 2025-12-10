@@ -1,0 +1,8 @@
+D:\Armando\$1 Corel\Escuela\Universidad\Programación\C#\FolderLocker\Aplicacion\FolderLocker.pdb
+D:\Armando\$1 Corel\Escuela\Universidad\Programación\C#\FolderLocker\Aplicacion\FolderLocker.dll.config
+D:\Armando\$1 Corel\Escuela\Universidad\Programación\C#\FolderLocker\Aplicacion\D3DCompiler_47_cor3.dll
+D:\Armando\$1 Corel\Escuela\Universidad\Programación\C#\FolderLocker\Aplicacion\PenImc_cor3.dll
+D:\Armando\$1 Corel\Escuela\Universidad\Programación\C#\FolderLocker\Aplicacion\PresentationNative_cor3.dll
+D:\Armando\$1 Corel\Escuela\Universidad\Programación\C#\FolderLocker\Aplicacion\vcruntime140_cor3.dll
+D:\Armando\$1 Corel\Escuela\Universidad\Programación\C#\FolderLocker\Aplicacion\wpfgfx_cor3.dll
+D:\Armando\$1 Corel\Escuela\Universidad\Programación\C#\FolderLocker\Aplicacion\FolderLocker.exe

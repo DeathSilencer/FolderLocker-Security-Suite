@@ -93,11 +93,11 @@ namespace FolderLocker
 
         #endregion
 
-        #region 3. LÓGICA DE BLOQUEO (ENCRIPTACIÓN)
+        #region 3. LÓGICA DE BLOQUEO (ENCRIPTACIÓN TRANSACCIONAL)
 
         private async void BtnAccionBloquear_Click(object sender, EventArgs e)
         {
-            // Validaciones Básicas
+            // Validaciones Básicas (Igual que antes)
             if (string.IsNullOrEmpty(txtRuta.Text)) { DarkDialogs.ShowInfo(Localization.Get("msg_select_dir")); return; }
             if (EsRutaProhibida(txtRuta.Text, out string errorSeguridad)) { DarkDialogs.ShowInfo(errorSeguridad, Localization.Get("err_security_title")); return; }
 
@@ -107,18 +107,12 @@ namespace FolderLocker
                 catch { DarkDialogs.ShowInfo("No se pudo encontrar ni crear la carpeta.", "Error"); return; }
             }
 
-            // --- CORRECCIÓN 1: VALIDACIÓN RECURSIVA INTELIGENTE ---
-            // Usamos EnumerateFiles con AllDirectories.
-            // Esto verifica si hay ALGÚN archivo real en todo el árbol de carpetas.
-            // Si solo hay carpetas vacías dentro de carpetas vacías, .Any() dará false.
             bool tieneArchivos = Directory.EnumerateFiles(txtRuta.Text, "*.*", SearchOption.AllDirectories).Any();
-
             if (!tieneArchivos)
             {
-                DarkDialogs.ShowInfo("La carpeta (y sus subcarpetas) no contienen archivos.\nNo se puede proteger una estructura vacía.", "Carpeta sin archivos");
-                return; // Cortamos flujo antes de romper nada
+                DarkDialogs.ShowInfo("La carpeta está vacía. No se puede proteger.", "Carpeta vacía");
+                return;
             }
-            // ------------------------------------------------------
 
             // Validaciones de Usuario
             if (!UserManager.Login(UserManager.CurrentUser.Username, txtContrasena.Text))
@@ -127,11 +121,32 @@ namespace FolderLocker
                 return;
             }
 
-            if (UserManager.CurrentUser.LockedFolders.Contains(txtRuta.Text))
+            // --- CAMBIO 1: REGISTRO PREVENTIVO (SAFETY FIRST) ---
+            // Si ocurre un apagón, la carpeta YA estará en la lista del usuario.
+            // Esto permite que al reiniciar, el usuario vea la carpeta y pueda darle a "Restaurar" 
+            // para arreglar cualquier archivo a medio procesar.
+
+            bool esNuevaProteccion = !UserManager.CurrentUser.LockedFolders.Contains(txtRuta.Text);
+
+            if (esNuevaProteccion)
             {
-                DarkDialogs.ShowInfo(Localization.Get("msg_already_list"));
-                return;
+                // Agregamos a la lista visualmente y en DB antes de tocar un solo byte
+                UserManager.CurrentUser.LockedFolders.Add(txtRuta.Text);
+                UserManager.SaveDatabase();
             }
+            else
+            {
+                // Si ya estaba en la lista, avisamos pero permitimos continuar (Modo Reparación/Reintento)
+                // Esto es vital para tu escenario: Si se fue la luz, el usuario vuelve a darle "Proteger" para terminar el trabajo.
+            }
+
+            // Ocultamos la carpeta INMEDIATAMENTE para que Windows no indexe mientras ciframos
+            try
+            {
+                CrearMarcador(txtRuta.Text); // Crea el locker.id con el OWNER
+                new DirectoryInfo(txtRuta.Text).Attributes = FileAttributes.Hidden | FileAttributes.System;
+            }
+            catch { }
 
             // UI Procesando
             ConfigurarUIProcesando(true);
@@ -146,52 +161,42 @@ namespace FolderLocker
                         progresoActivo.Actualizar(data.Item1, data.Item2);
                 });
 
-                if (EsCarpetaYaProtegidaFisicamente(txtRuta.Text))
+                // Verificamos propiedad si ya existe el marcador
+                if (EsCarpetaYaProtegidaFisicamente(txtRuta.Text) && !EsElPropietario(txtRuta.Text))
                 {
-                    if (!EsElPropietario(txtRuta.Text))
-                    {
-                        CerrarBarraProgreso(); // IMPORTANTE: Cerrar antes de mostrar mensaje
-                        DarkDialogs.ShowInfo(Localization.Get("err_not_owner") ?? "⛔ ACCESO DENEGADO", Localization.Get("title_security"));
-                        return;
-                    }
-
                     CerrarBarraProgreso();
-                    DarkDialogs.ShowInfo(Localization.Get("msg_rec_text"), Localization.Get("msg_rec_title"));
+                    DarkDialogs.ShowInfo(Localization.Get("err_not_owner"), Localization.Get("title_security"));
+                    return;
+                }
+
+                // Llamamos al nuevo proceso blindado
+                await ProcesarArchivosAsync(txtRuta.Text, txtContrasena.Text, true, progressHandler);
+
+                CerrarBarraProgreso();
+
+                if (!this.Visible)
+                {
+                    trayIcon.ShowBalloonTip(5000, Localization.Get("tray_done"), Localization.Get("tray_done_lock"), ToolTipIcon.Info);
+                    RestaurarVentana();
                 }
                 else
                 {
-                    await ProcesarArchivosAsync(txtRuta.Text, txtContrasena.Text, true, progressHandler);
-
-                    CrearMarcador(txtRuta.Text);
-                    new DirectoryInfo(txtRuta.Text).Attributes = FileAttributes.Hidden | FileAttributes.System;
-
-                    // Guardar en DB solo si tuvo éxito
-                    if (UserManager.CurrentUser != null)
-                    {
-                        UserManager.CurrentUser.LockedFolders.Add(txtRuta.Text);
-                        UserManager.SaveDatabase();
-                    }
-
-                    CerrarBarraProgreso(); // Cerramos antes de notificar
-
-                    if (!this.Visible)
-                    {
-                        trayIcon.ShowBalloonTip(5000, Localization.Get("tray_done"), Localization.Get("tray_done_lock"), ToolTipIcon.Info);
-                        RestaurarVentana();
-                    }
-                    else
-                    {
-                        DarkDialogs.ShowInfo(Localization.Get("msg_lock_success"), Localization.Get("title_success"));
-                    }
-
-                    txtContrasena.Text = "";
-                    txtRuta.Text = "";
+                    DarkDialogs.ShowInfo(Localization.Get("msg_lock_success"), Localization.Get("title_success"));
                 }
+
+                txtContrasena.Text = "";
+                txtRuta.Text = "";
+
+                // Refrescamos listas si están visibles
+                if (panelMontar.Visible) ActualizarYMostrarPanelMontar();
+                if (panelRestaurar.Visible) ActualizarYMostrarPanelRestaurar();
             }
             catch (Exception ex)
             {
-                CerrarBarraProgreso(); // <--- CRÍTICO: Cerrar barra si hay error
-                DarkDialogs.ShowInfo("Error crítico: " + ex.Message);
+                CerrarBarraProgreso();
+                // Si falla algo crítico, NO quitamos la carpeta de la lista.
+                // Es mejor que el usuario tenga acceso a "Restaurar" para intentar arreglarlo.
+                DarkDialogs.ShowInfo("Hubo una interrupción: " + ex.Message + "\n\nLa carpeta se ha guardado en tu lista para que puedas intentar Restaurarla o Protegerla nuevamente.");
             }
             finally
             {
@@ -199,6 +204,7 @@ namespace FolderLocker
                 ConfigurarUIProcesando(false);
             }
         }
+
         #endregion
 
         #region 4. LÓGICA DE DESBLOQUEO (RESTAURACIÓN)
@@ -262,18 +268,22 @@ namespace FolderLocker
 
                     CerrarBarraProgreso(); // Cerrar antes de mostrar éxito
 
-                    if (!this.Visible)
-                    {
-                        trayIcon.ShowBalloonTip(5000, Localization.Get("tray_done"), Localization.Get("tray_done_decrypt"), ToolTipIcon.Info);
-                        RestaurarVentana();
-                    }
-                    else
-                    {
-                        DarkDialogs.ShowResultWithCopy(Localization.Get("msg_decrypt_success"), rutaSeleccionada);
-                    }
+                    // --- CAMBIO: FLUJO UNIFICADO DE NOTIFICACIÓN ---
 
+                    // 1. Siempre lanzamos la notificación al Tray (Confirmación visual externa)
+                    trayIcon.ShowBalloonTip(5000, Localization.Get("tray_done"), Localization.Get("tray_done_decrypt"), ToolTipIcon.Info);
+
+                    // 2. Siempre aseguramos que la ventana esté visible y al frente
+                    RestaurarVentana();
+
+                    // 3. Mostramos el resultado "Pegado" a la ventana principal (pasamos 'this')
+                    // Al pasar 'this', DarkDialogs usará CenterParent.
+                    DarkDialogs.ShowResultWithCopy(Localization.Get("msg_decrypt_success"), rutaSeleccionada, this);
+
+                    // 4. Regresamos al panel principal
                     MostrarPanelProteger();
                 }
+
                 catch (Exception ex)
                 {
                     // --- CORRECCIÓN CRÍTICA ---
@@ -460,19 +470,18 @@ namespace FolderLocker
 
         #endregion
 
-        #region 7. MOTOR DE PROCESAMIENTO DE ARCHIVOS
+        #region 7. MOTOR DE PROCESAMIENTO (ACTUALIZADO: ATOMIC SAVE)
 
         private async System.Threading.Tasks.Task ProcesarArchivosAsync(string rutaBase, string password, bool esEncriptar, IProgress<Tuple<int, string>> progreso)
         {
             await System.Threading.Tasks.Task.Run(() =>
             {
                 var motorCifrado = new CryptoService(password);
-                var mapa = new DirectoryMap(rutaBase, motorCifrado, false);
+                var mapa = new DirectoryMap(rutaBase, motorCifrado, true);
 
-                // Verificación de integridad
                 if (!esEncriptar && File.Exists(Path.Combine(rutaBase, "dir.idx")) && mapa.GetAll().Count == 0)
                 {
-                    throw new Exception("¡Contraseña Incorrecta! El índice está vacío o corrupto.");
+                    throw new Exception("¡Contraseña Incorrecta! El índice no se puede leer.");
                 }
 
                 var archivos = Directory.GetFiles(rutaBase, "*.*", SearchOption.AllDirectories);
@@ -483,77 +492,126 @@ namespace FolderLocker
                 foreach (var archivoPath in archivos)
                 {
                     string nombreArchivoFisico = Path.GetFileName(archivoPath);
-                    if (nombreArchivoFisico.ToLower() == "locker.id" || nombreArchivoFisico.ToLower() == "dir.idx") continue;
+                    string nombreLow = nombreArchivoFisico.ToLower();
+
+                    // Limpieza: Si encontramos un .tmp viejo de un apagón anterior, lo ignoramos o borramos
+                    if (nombreLow.EndsWith(".tmp"))
+                    {
+                        try { File.Delete(archivoPath); } catch { }
+                        continue;
+                    }
+                    if (nombreLow == "locker.id" || nombreLow == "dir.idx") continue;
 
                     try
                     {
                         FileEntry entry = null;
 
-                        // --- FASE 1: IDENTIFICACIÓN EN MAPA ---
+                        // --- FASE 1: IDENTIFICACIÓN ---
                         if (esEncriptar)
                         {
+                            entry = mapa.GetByPhysicalName(nombreArchivoFisico);
+                            if (entry != null) { bytesProcesadosTotal += new FileInfo(archivoPath).Length; continue; }
+
                             entry = mapa.GetByRealName(nombreArchivoFisico);
-                            if (entry == null)
-                            {
-                                mapa.AddEntry(nombreArchivoFisico, false);
-                                entry = mapa.GetByRealName(nombreArchivoFisico);
-                            }
+                            if (entry == null) entry = mapa.AddEntry(nombreArchivoFisico, false);
                         }
                         else
                         {
                             entry = mapa.GetByPhysicalName(nombreArchivoFisico);
-                            // Fallback para extensiones .restored
                             if (entry == null && nombreArchivoFisico.EndsWith(".restored"))
-                            {
                                 entry = mapa.GetByPhysicalName(nombreArchivoFisico.Replace(".restored", ""));
-                            }
-                        }
 
-                        // --- FASE 2: CRIPTOGRAFÍA (CORREGIDO SYSTEM.IO) ---
-                        // AQUÍ ESTABA EL ERROR: Agregamos "System.IO." antes de cada Enum
-                        using (var fs = new FileStream(archivoPath, System.IO.FileMode.Open, System.IO.FileAccess.ReadWrite, System.IO.FileShare.None))
-                        {
-                            int bufferSize = 1024 * 1024; // 1MB Buffer
-                            byte[] buffer = new byte[bufferSize];
-                            int bytesLeidos;
-                            long offsetGlobal = 0;
-
-                            while ((bytesLeidos = fs.Read(buffer, 0, bufferSize)) > 0)
+                            // FILTRO DE INOCENCIA (Lo que agregamos antes)
+                            bool pareceEncriptado = nombreArchivoFisico.EndsWith(".lock");
+                            if (entry == null && !pareceEncriptado)
                             {
-                                motorCifrado.TransformarDatos(buffer, offsetGlobal, bytesLeidos);
-                                fs.Seek(-bytesLeidos, SeekOrigin.Current);
-                                fs.Write(buffer, 0, bytesLeidos);
-                                offsetGlobal += bytesLeidos;
-
-                                bytesProcesadosTotal += bytesLeidos;
-                                int p = (int)((bytesProcesadosTotal * 100) / totalBytes);
-                                progreso.Report(Tuple.Create(Math.Min(p, 100), string.Format(Localization.Get("prog_file_lbl"), nombreArchivoFisico)));
+                                bytesProcesadosTotal += new FileInfo(archivoPath).Length;
+                                continue;
                             }
                         }
 
-                        // --- FASE 3: RENOMBRADO (OFUSCACIÓN) ---
+                        // --- FASE 2: CRIPTOGRAFÍA SEGURA (ATOMIC SWAP) ---
+
+                        string rutaTemp = archivoPath + ".tmp"; // Archivo de trabajo seguro
+
+                        using (var fsOrigen = new FileStream(archivoPath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read))
+                        {
+                            using (var fsDestino = new FileStream(rutaTemp, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None))
+                            {
+                                int bufferSize = 1024 * 1024;
+                                byte[] buffer = new byte[bufferSize];
+                                int bytesLeidos;
+                                long offsetGlobal = 0;
+
+                                while ((bytesLeidos = fsOrigen.Read(buffer, 0, bufferSize)) > 0)
+                                {
+                                    motorCifrado.TransformarDatos(buffer, offsetGlobal, bytesLeidos);
+
+                                    // Escribimos en el archivo TEMPORAL, no en el original
+                                    fsDestino.Write(buffer, 0, bytesLeidos);
+
+                                    offsetGlobal += bytesLeidos;
+                                    bytesProcesadosTotal += bytesLeidos;
+
+                                    int p = (int)((bytesProcesadosTotal * 100) / totalBytes);
+                                    string estado = esEncriptar ? $"Protegiendo: {nombreArchivoFisico}" : $"Restaurando: {nombreArchivoFisico}";
+                                    progreso.Report(Tuple.Create(Math.Min(p, 100), estado));
+                                }
+                            }
+                        }
+
+                        // --- FASE CRÍTICA: EL CAMBIAZO (SWAP BLINDADO) ---
+                        // Lógica: "Crear Destino -> Borrar Origen"
+                        // Así nunca hay un momento en que el archivo deje de existir.
+
+                        string rutaFinal = archivoPath;
+
+                        // 1. Calcular nombre final
                         if (esEncriptar && entry != null)
                         {
-                            string rutaOfuscada = Path.Combine(Path.GetDirectoryName(archivoPath), entry.PhysicalName);
-                            if (!File.Exists(rutaOfuscada)) File.Move(archivoPath, rutaOfuscada);
+                            rutaFinal = Path.Combine(Path.GetDirectoryName(archivoPath), entry.PhysicalName);
                         }
-                        else if (!esEncriptar)
+                        else if (!esEncriptar && entry != null)
                         {
-                            if (entry != null)
-                            {
-                                string rutaOriginal = Path.Combine(Path.GetDirectoryName(archivoPath), entry.RealName);
-                                if (File.Exists(rutaOriginal)) rutaOriginal = Path.Combine(Path.GetDirectoryName(archivoPath), "Restored_" + entry.RealName);
-                                File.Move(archivoPath, rutaOriginal);
-                                mapa.RemoveEntry(entry.RealName);
-                            }
-                            else if (!archivoPath.EndsWith(".restored"))
-                            {
-                                string rutaDestino = archivoPath + ".restored";
-                                if (!File.Exists(rutaDestino)) File.Move(archivoPath, rutaDestino);
-                            }
+                            rutaFinal = Path.Combine(Path.GetDirectoryName(archivoPath), entry.RealName);
                         }
+
+                        // 2. Limpieza preventiva del destino
+                        // Si por un apagón anterior quedó un archivo a medias en el destino, lo quitamos para poder escribir el bueno.
+                        if (rutaFinal != archivoPath && File.Exists(rutaFinal))
+                        {
+                            // Caso especial: Si estamos restaurando y el destino ya existe, usamos "Restored_" para no sobrescribir algo importante
+                            if (!esEncriptar)
+                            {
+                                rutaFinal = Path.Combine(Path.GetDirectoryName(archivoPath), "Restored_" + entry.RealName);
+                            }
+
+                            // Si aún así existe (ej: Restored_Video.mp4 ya existe), borramos ese para poner el nuevo recién procesado
+                            if (File.Exists(rutaFinal)) File.Delete(rutaFinal);
+                        }
+
+                        // 3. MOVEMOS EL TEMPORAL AL FINAL (Aquí nace el archivo seguro)
+                        // En este momento exacto, existen TANTO el original (archivoPath) COMO el nuevo (rutaFinal).
+                        File.Move(rutaTemp, rutaFinal);
+
+                        // 4. BORRAMOS EL ORIGINAL (Solo si el paso 3 tuvo éxito)
+                        // Si se va la luz aquí, tendrás el archivo duplicado (encriptado y desencriptado), pero no perdiste nada.
+                        if (rutaFinal != archivoPath)
+                        {
+                            File.Delete(archivoPath);
+                        }
+
+                        // 5. Actualizamos Mapa
+                        if (esEncriptar) mapa.GuardarIndice();
+                        else if (!esEncriptar && entry != null) mapa.RemoveEntry(entry.RealName);
+
                     }
-                    catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Error archivo: " + ex.Message); }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Error crítico archivo: " + ex.Message);
+                        // Si falló, intentamos borrar el .tmp para no dejar basura
+                        try { if (File.Exists(archivoPath + ".tmp")) File.Delete(archivoPath + ".tmp"); } catch { }
+                    }
                 }
 
                 // --- FASE 4: FINALIZACIÓN ---
@@ -561,7 +619,6 @@ namespace FolderLocker
 
                 if (!esEncriptar && mapa.GetAll().Count == 0)
                 {
-                    // Limpieza total si se desencriptó todo
                     EliminarArchivoSeguro(Path.Combine(rutaBase, "dir.idx"));
                     EliminarArchivoSeguro(Path.Combine(rutaBase, "locker.id"));
                 }

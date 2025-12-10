@@ -139,9 +139,15 @@ namespace FolderLocker
         }
 
         // 4. RESULTADO CON COPIA (Enter o Esc cierran)
-        public static void ShowResultWithCopy(string mensaje, string textoParaCopiar)
+        public static void ShowResultWithCopy(string mensaje, string textoParaCopiar, IWin32Window owner = null)
         {
             using var form = CrearBase("Result", 450, 320);
+
+            // Si nos pasan un dueño, nos centramos en él. Si no, al centro de la pantalla.
+            if (owner != null)
+            {
+                form.StartPosition = FormStartPosition.CenterParent;
+            }
 
             var lbl = CrearLabel(mensaje, 20, 50, 410);
             form.Controls.Add(lbl);
@@ -164,14 +170,14 @@ namespace FolderLocker
             btnOk.Click += (s, e) => form.Close();
             form.Controls.Add(btnOk);
 
-            // --- KEYBOARD SUPPORT ---
             form.AcceptButton = btnOk;
             form.CancelButton = btnOk;
 
-            // Al mostrar, seleccionar todo el texto para facilitar Ctrl+C
             form.Shown += (s, e) => { txtRuta.Focus(); txtRuta.SelectAll(); };
 
-            form.ShowDialog();
+            // MOSTRAR: Si hay dueño, usamos ShowDialog(owner)
+            if (owner != null) form.ShowDialog(owner);
+            else form.ShowDialog();
         }
 
         #endregion
