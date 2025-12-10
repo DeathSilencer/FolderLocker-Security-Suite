@@ -1,0 +1,34 @@
+## Ignorar carpetas de Visual Studio (Configuraciones locales)
+.vs/
+.vscode/
+
+## Ignorar resultados de compilación (Binarios)
+[Bb]in/
+[Oo]bj/
+
+## Ignorar archivos de usuario y temporales
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Ignorar archivos temporales de sistema
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+## Ignorar paquetes NuGet (Se restauran solos)
+*.nupkg
+**/packages/*
+!**/packages/build/
+*.nuget.props
+*.nuget.targets
+
+## Ignorar archivos de log y crash dumps
+*.log
+*.dmp
+
+## Ignorar configuraciones sensibles (Si usaras appsettings.local.json)
+# appsettings.Development.json
+# secrets.json
