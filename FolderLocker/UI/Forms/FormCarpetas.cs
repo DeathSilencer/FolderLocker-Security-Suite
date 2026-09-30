@@ -1,4 +1,4 @@
-﻿using DokanNet;
+using DokanNet;
 
 namespace FolderLocker
 {
@@ -8,6 +8,7 @@ namespace FolderLocker
 
         // Control de unidades montadas (Ruta Física -> Letra Unidad)
         private Dictionary<string, string> montajesActivos = new Dictionary<string, string>();
+        private Dictionary<string, DokanInstance> instanciasDokan = new Dictionary<string, DokanInstance>();
 
         // Bandera para distinguir entre minimizar al tray y cerrar la app real
         private bool cierreReal = false;
@@ -368,89 +369,140 @@ namespace FolderLocker
             MontarMotorDokan(rutaSeleccionada, letraDeseada, txtPassMontar.Text);
         }
 
+        private bool VerificarDokanDisponible(out string error)
+        {
+            try
+            {
+                var dokan = new DokanNet.Dokan(null);
+                int version = dokan.Version;
+                int driverVersion = dokan.DriverVersion;
+                if (driverVersion == 0)
+                {
+                    error = "El controlador de disco virtual (Dokan) no está activo en el sistema.\n\nSi acabas de instalar el programa, por favor reinicia tu computadora para que Windows inicie el servicio del controlador.";
+                    return false;
+                }
+                error = string.Empty;
+                return true;
+            }
+            catch (DllNotFoundException)
+            {
+                error = "No se encontró la librería 'dokan2.dll' o faltan componentes de Microsoft Visual C++ Redistributable (x64) en esta computadora.\n\nPor favor reinstala la aplicación usando el instalador oficial de FolderLocker.";
+                return false;
+            }
+            catch (DokanException ex)
+            {
+                error = "El servicio del controlador Dokan no está en ejecución (" + ex.Message + ").\n\nPor favor reinicia tu computadora o ejecuta la aplicación como Administrador.";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                error = "No fue posible verificar el servicio de disco virtual: " + ex.Message;
+                return false;
+            }
+        }
+
         private void MontarMotorDokan(string ruta, string letra, string password)
         {
-            Thread t = new Thread(() =>
+            if (!VerificarDokanDisponible(out string errorDokan))
             {
-                try
-                {
-                    // Instancia Dokan para manipular el punto de montaje
-                    var dokan = new DokanNet.Dokan(null);
+                DarkDialogs.ShowInfo(errorDokan, "Controlador Requerido", this);
+                return;
+            }
 
-                    // Eliminar montajes anteriores con la misma letra (evita errores de caché)
-                    try { dokan.RemoveMountPoint(letra); } catch { }
+            try
+            {
+                var dokan = new DokanNet.Dokan(null);
+                try { dokan.RemoveMountPoint(letra); } catch { }
 
-                    var espejo = new Mirror(ruta, password);
-
-                    // --- CONFIGURACIÓN DEL MOTOR DOKAN ---
-                    var builder = new DokanInstanceBuilder(dokan)
+                var espejo = new Mirror(ruta, password);
+                var builder = new DokanInstanceBuilder(dokan)
                     .ConfigureOptions(o =>
                     {
-                        // 1. Asignamos opciones BASE
-                        o.Options = DokanOptions.RemovableDrive;
-
-                        // 2. IMPORTANTE: Usamos "|=" para AGREGAR, no "=" para reemplazar
-                        o.Options |= DokanOptions.MountManager;
-                        // o.Options |= DokanOptions.WriteProtection; // <--- OJO: Si activas esto, NO podrás guardar archivos ni crear carpetas. Solo actívalo si quieres "Solo Lectura".
-
+                        o.Options = DokanOptions.RemovableDrive | DokanOptions.MountManager;
                         o.MountPoint = letra;
                     });
 
-                    using (var instance = builder.Build(espejo))
-                    {
-                        // Mantiene la instancia viva hasta desmontar la unidad
-                        instance.WaitForFileSystemClosed(uint.MaxValue);
-                    }
-                }
-                catch (Exception ex)
+                var instance = builder.Build(espejo);
+                instanciasDokan[ruta] = instance;
+                montajesActivos[ruta] = letra;
+
+                Thread t = new Thread(() =>
                 {
-                    MessageBox.Show("Error Dokan: " + ex.Message, "Dokan Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            });
+                    try
+                    {
+                        using (instance)
+                        {
+                            instance.WaitForFileSystemClosed(uint.MaxValue);
+                        }
+                    }
+                    catch { }
+                    finally
+                    {
+                        if (!this.IsDisposed && this.IsHandleCreated)
+                        {
+                            try
+                            {
+                                this.BeginInvoke((MethodInvoker)delegate
+                                {
+                                    instanciasDokan.Remove(ruta);
+                                    montajesActivos.Remove(ruta);
+                                });
+                            }
+                            catch { }
+                        }
+                    }
+                });
+                t.IsBackground = true;
+                t.Start();
 
-            t.IsBackground = true;
-            t.Start();
+                DarkDialogs.ShowInfo(
+                    string.Format(Localization.Get("msg_mount_success"), letra),
+                    Localization.Get("title_success"),
+                    this
+                );
 
-            montajesActivos[ruta] = letra;
-
-            DarkDialogs.ShowInfo(
-                string.Format(Localization.Get("msg_mount_success"), letra),
-                Localization.Get("title_success")
-            );
-
-            txtPassMontar.Text = "";
+                txtPassMontar.Text = "";
+            }
+            catch (Exception ex)
+            {
+                DarkDialogs.ShowInfo("Error al montar la unidad virtual: " + ex.Message, "Error Dokan", this);
+            }
         }
-
 
         private void BtnAccionDesmontar_Click(object sender, EventArgs e)
         {
-            if (lstCarpetasParaMontar.SelectedItem == null) { DarkDialogs.ShowInfo(Localization.Get("msg_unmount_select")); return; }
+            if (lstCarpetasParaMontar.SelectedItem == null) { DarkDialogs.ShowInfo(Localization.Get("msg_unmount_select"), Localization.Get("title_warning"), this); return; }
 
             string rutaSeleccionada = lstCarpetasParaMontar.SelectedItem.ToString();
 
             if (montajesActivos.ContainsKey(rutaSeleccionada))
             {
                 string letraAsociada = montajesActivos[rutaSeleccionada];
-                if (DesmontarSilencioso(letraAsociada))
+                if (DesmontarSilencioso(letraAsociada, rutaSeleccionada))
                 {
                     montajesActivos.Remove(rutaSeleccionada);
-                    DarkDialogs.ShowInfo(string.Format(Localization.Get("msg_unmount_success"), letraAsociada));
+                    DarkDialogs.ShowInfo(string.Format(Localization.Get("msg_unmount_success"), letraAsociada), Localization.Get("title_success"), this);
                 }
                 else
                 {
-                    DarkDialogs.ShowInfo(Localization.Get("msg_unmount_error"));
+                    DarkDialogs.ShowInfo(Localization.Get("msg_unmount_error"), Localization.Get("title_error"), this);
                 }
             }
             else
             {
-                DarkDialogs.ShowInfo(Localization.Get("msg_no_vault"));
+                DarkDialogs.ShowInfo(Localization.Get("msg_no_vault"), Localization.Get("title_warning"), this);
             }
         }
 
-        private bool DesmontarSilencioso(string letra)
+        private bool DesmontarSilencioso(string letra, string ruta = null)
         {
             try
             {
+                if (!string.IsNullOrEmpty(ruta) && instanciasDokan.TryGetValue(ruta, out var instance))
+                {
+                    try { instance.Dispose(); } catch { }
+                    instanciasDokan.Remove(ruta);
+                }
                 new DokanNet.Dokan(null).RemoveMountPoint(letra);
                 return true;
             }
@@ -754,7 +806,7 @@ namespace FolderLocker
             }
             else
             {
-                foreach (var kvp in montajesActivos) DesmontarSilencioso(kvp.Value);
+                foreach (var kvp in montajesActivos) DesmontarSilencioso(kvp.Value, kvp.Key);
             }
             base.OnFormClosing(e);
         }
