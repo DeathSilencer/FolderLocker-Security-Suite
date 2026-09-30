@@ -297,24 +297,24 @@ namespace FolderLocker
         {
             int btnWidth = 260;
 
-            btnCarpetas.Text = "🔒  PROTEGER";
+            btnCarpetas.Text = Localization.Get("menu_protect");
             btnCarpetas.Size = new Size(btnWidth, 45);
             btnCarpetas.Location = new Point(0, 155);
             EstilarBotonSidebar(btnCarpetas);
 
-            btnMenuAbrir.Text = "🔓  ABRIR BÓVEDA";
+            btnMenuAbrir.Text = Localization.Get("menu_unlock");
             btnMenuAbrir.Size = new Size(btnWidth, 45);
             btnMenuAbrir.Location = new Point(0, 205);
             EstilarBotonSidebar(btnMenuAbrir);
 
             if (btnExplorador == null) { btnExplorador = new Button(); PanelOpciones.Controls.Add(btnExplorador); }
-            btnExplorador.Text = "📂  MIS ARCHIVOS";
+            btnExplorador.Text = Localization.Get("menu_files");
             btnExplorador.Size = new Size(btnWidth, 45);
             btnExplorador.Location = new Point(0, 255);
             EstilarBotonSidebar(btnExplorador);
 
             if (btnManual == null) { btnManual = new Button(); PanelOpciones.Controls.Add(btnManual); }
-            btnManual.Text = "📘  MANUAL";
+            btnManual.Text = Localization.Get("menu_manual");
             btnManual.Size = new Size(btnWidth, 45);
             btnManual.Location = new Point(0, 305);
             EstilarBotonSidebar(btnManual);
@@ -322,14 +322,14 @@ namespace FolderLocker
             int yFondo = PanelOpciones.Height;
 
             if (btnSalir == null) { btnSalir = new Button(); PanelOpciones.Controls.Add(btnSalir); }
-            btnSalir.Text = "🚪  SALIR";
+            btnSalir.Text = Localization.Get("menu_exit");
             btnSalir.Size = new Size(260, 45);
             EstilarBotonSidebar(btnSalir);
             btnSalir.Location = new Point(0, yFondo - 60);
             btnSalir.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
 
             if (btnSetup == null) { btnSetup = new Button(); PanelOpciones.Controls.Add(btnSetup); }
-            btnSetup.Text = "⚙️ CONFIGURACIÓN";
+            btnSetup.Text = Localization.Get("menu_config");
             btnSetup.Size = new Size(260, 45);
             EstilarBotonSidebar(btnSetup);
             btnSetup.Location = new Point(0, yFondo - 110);
@@ -617,6 +617,7 @@ namespace FolderLocker
             _montarView?.ActualizarIdioma();
             _configView?.ActualizarIdioma();
             _manualView?.ActualizarIdioma();
+            _creditosView?.ActualizarIdioma();
             _setupView?.ActualizarIdioma();
 
             // System Tray

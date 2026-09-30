@@ -21,6 +21,7 @@ namespace FolderLocker.UI.Views
         private Button btnLoginForgot = null!;
         private Button btnLoginEnter = null!;
         private Button btnLoginReg = null!;
+        private Label lblBrandingDesc = null!;
 
         private readonly string _lastUserFile = Path.Combine(Application.StartupPath, "last_user.dat");
 
@@ -166,7 +167,7 @@ namespace FolderLocker.UI.Views
             {
                 if (string.IsNullOrEmpty(txtUser.Text))
                 {
-                    DarkDialogs.ShowInfo("Escribe tu usuario primero.");
+                    DarkDialogs.ShowInfo(Localization.Get("login_err_user_first"));
                     return;
                 }
                 string code = DarkDialogs.ShowInput(Localization.Get("rec_prompt_msg"), Localization.Get("rec_prompt_title"), false);
@@ -260,9 +261,9 @@ namespace FolderLocker.UI.Views
                 pnlBranding.Controls.Add(imgCompuesta);
                 imgCompuesta.MouseDown += (s, e) => WindowDragMouseDown?.Invoke(s, e);
 
-                var lblDesc = new Label
+                lblBrandingDesc = new Label
                 {
-                    Text = "Grado de Seguridad Militar AES-256 CTR\nAcceso transparente mediante Unidad Virtual Dokan\nProtección absoluta 'Zero-Knowledge'",
+                    Text = Localization.Get("login_branding_desc"),
                     ForeColor = Color.FromArgb(140, 140, 140),
                     Font = new Font("Segoe UI", 10, FontStyle.Regular),
                     AutoSize = false,
@@ -270,7 +271,7 @@ namespace FolderLocker.UI.Views
                     Location = new Point(20, 410),
                     TextAlign = ContentAlignment.MiddleCenter
                 };
-                pnlBranding.Controls.Add(lblDesc);
+                pnlBranding.Controls.Add(lblBrandingDesc);
             }
             catch { }
         }
@@ -285,6 +286,10 @@ namespace FolderLocker.UI.Views
             btnLoginForgot.Text = Localization.Get("link_forgot");
             btnLoginEnter.Text = Localization.Get("login_btn_enter");
             btnLoginReg.Text = Localization.Get("login_btn_reg");
+            if (lblBrandingDesc != null)
+            {
+                lblBrandingDesc.Text = Localization.Get("login_branding_desc");
+            }
             if (lblAutoLockNotice != null)
             {
                 lblAutoLockNotice.Text = Localization.Get("msg_autolock_triggered") ?? "🔒 Sesión bloqueada por inactividad";

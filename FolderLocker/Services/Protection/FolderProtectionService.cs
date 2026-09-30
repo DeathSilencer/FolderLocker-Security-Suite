@@ -72,7 +72,7 @@ namespace FolderLocker.Services.Protection
             // Validar que no esté montada como unidad virtual en Dokan
             if (vaultService.IsMounted(rNorm))
             {
-                string msgDokan = "Esta carpeta está actualmente montada como unidad virtual.\n\nPor favor desmonta la unidad virtual antes de intentar protegerla o modificar su cifrado.";
+                string msgDokan = Localization.Get("err_folder_mounted_dokan");
                 SecurityAuditLogger.LogSecurity("PROTECT_VALIDATION", "Conflicto con Dokan", false, msgDokan, rNorm);
                 return ProtectionValidationResult.Fail(msgDokan, isCritical: true);
             }
@@ -86,7 +86,7 @@ namespace FolderLocker.Services.Protection
             }
             catch (Exception ex)
             {
-                string msgPermiso = $"No tienes permisos suficientes de escritura en esta carpeta:\n{ex.Message}\n\nAsegúrate de tener permisos de administrador o de que los archivos no estén bloqueados.";
+                string msgPermiso = string.Format(Localization.Get("err_insufficient_permissions"), ex.Message);
                 SecurityAuditLogger.LogSecurity("PROTECT_VALIDATION", "Prueba de Escritura Fallida", false, msgPermiso, rNorm);
                 return ProtectionValidationResult.Fail(msgPermiso, isCritical: true);
             }
@@ -102,7 +102,7 @@ namespace FolderLocker.Services.Protection
                     long espacioRequerido = scan.TotalBytes + (50L * 1024 * 1024);
                     if (drive.AvailableFreeSpace < espacioRequerido)
                     {
-                        string msgEspacio = $"Espacio insuficiente en disco.\n\nSe requieren aproximadamente {FormatearTamano(espacioRequerido)} libres para un cifrado atómico seguro con Two-Phase Commit, pero solo hay {FormatearTamano(drive.AvailableFreeSpace)} disponibles en la unidad {root}.";
+                        string msgEspacio = string.Format(Localization.Get("err_insufficient_disk_space"), FormatearTamano(espacioRequerido), FormatearTamano(drive.AvailableFreeSpace), root);
                         SecurityAuditLogger.LogSecurity("PROTECT_VALIDATION", "Espacio en Disco Insuficiente", false, msgEspacio, rNorm);
                         return ProtectionValidationResult.Fail(msgEspacio, isCritical: true);
                     }
@@ -469,17 +469,21 @@ namespace FolderLocker.Services.Protection
             double segundosTotales = Math.Max(segPorBytes, segPorArchivos);
 
             if (segundosTotales < 5)
-                return Localization.CurrentLang == "EN" ? "Less than 5 seconds" : "Menos de 5 segundos";
+                return Localization.Get("time_less_5s");
             if (segundosTotales < 60)
-                return Localization.CurrentLang == "EN" ? $"Approx. {(int)Math.Ceiling(segundosTotales)} seconds" : $"Aprox. {(int)Math.Ceiling(segundosTotales)} segundos";
+                return string.Format(Localization.Get("time_approx_seconds"), (int)Math.Ceiling(segundosTotales));
 
             int minutos = (int)Math.Ceiling(segundosTotales / 60.0);
             if (minutos < 60)
-                return Localization.CurrentLang == "EN" ? $"Approx. {minutos} minute(s)" : $"Aprox. {minutos} {(minutos == 1 ? "minuto" : "minutos")}";
+            {
+                if (minutos == 1)
+                    return Localization.Get("time_approx_minute");
+                return string.Format(Localization.Get("time_approx_minutes"), minutos);
+            }
 
             int horas = minutos / 60;
             int minsRestantes = minutos % 60;
-            return Localization.CurrentLang == "EN" ? $"Approx. {horas}h {minsRestantes}m" : $"Aprox. {horas}h {minsRestantes}m";
+            return string.Format(Localization.Get("time_approx_hours_mins"), horas, minsRestantes);
         }
     }
 }

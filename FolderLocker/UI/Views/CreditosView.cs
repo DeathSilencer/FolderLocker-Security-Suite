@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using FolderLocker;
 using FolderLocker.UI.Common;
 
 namespace FolderLocker.UI.Views
@@ -6,6 +7,8 @@ namespace FolderLocker.UI.Views
     public class CreditosView : UserControl
     {
         private Panel card = null!;
+        private Label lblBadge1 = null!;
+        private Label lblBadge2 = null!;
         private Label lblTitulo = null!;
         private UITheme.CircularPictureBox pbFoto = null!;
         private Label lblDevInfo = null!;
@@ -21,6 +24,7 @@ namespace FolderLocker.UI.Views
             this.Dock = DockStyle.Fill;
             this.BackColor = UITheme.cBackground;
             InicializarComponentes();
+            ActualizarIdioma();
         }
 
         private void InicializarComponentes()
@@ -41,13 +45,13 @@ namespace FolderLocker.UI.Views
 
             // Badges superiores
             int badgeY = 18;
-            var badge1 = CrearBadge("👨‍💻 DESARROLLADOR", Color.FromArgb(50, 22, 22), Color.FromArgb(252, 165, 165), 40, badgeY);
-            var badge2 = CrearBadge("🚀 FOLDERLOCKER SUITE", Color.FromArgb(36, 33, 33), Color.FromArgb(209, 213, 219), 180, badgeY);
-            card.Controls.AddRange(new Control[] { badge1, badge2 });
+            lblBadge1 = CrearBadge(Localization.Get("cred_badge_dev"), Color.FromArgb(50, 22, 22), Color.FromArgb(252, 165, 165), 40, badgeY);
+            lblBadge2 = CrearBadge(Localization.Get("cred_badge_suite"), Color.FromArgb(36, 33, 33), Color.FromArgb(209, 213, 219), 180, badgeY);
+            card.Controls.AddRange(new Control[] { lblBadge1, lblBadge2 });
 
             lblTitulo = new Label
             {
-                Text = "CRÉDITOS Y DESARROLLADOR",
+                Text = Localization.Get("cred_title"),
                 ForeColor = UITheme.cTextPrimary,
                 Font = new Font("Segoe UI Semibold", 18, FontStyle.Bold),
                 AutoSize = true,
@@ -67,7 +71,7 @@ namespace FolderLocker.UI.Views
 
             lblDevInfo = new Label
             {
-                Text = "David Armando Platas\nLead Software Engineer & Security Architect\n\nContacto: davarman10@gmail.com",
+                Text = Localization.Get("cred_author_info"),
                 Font = new Font("Segoe UI", 10.5f),
                 ForeColor = UITheme.cTextPrimary,
                 Location = new Point(180, 120),
@@ -78,7 +82,7 @@ namespace FolderLocker.UI.Views
 
             lblVersion = new Label
             {
-                Text = "FolderLocker Security Suite v2.0 • 2026\nDesarrollado con C#, .NET 8, Dokan Mirror Driver & AES-256 CTR Atómico.",
+                Text = Localization.Get("cred_desc"),
                 Font = new Font("Segoe UI", 9),
                 ForeColor = UITheme.cTextSecondary,
                 Location = new Point(50, 240),
@@ -89,7 +93,7 @@ namespace FolderLocker.UI.Views
 
             btnGitHub = new Button
             {
-                Text = "🌐 Visitar GitHub",
+                Text = Localization.Get("cred_btn_github"),
                 Size = new Size(280, 48),
                 Location = new Point(50, 305),
                 BackColor = Color.FromArgb(46, 42, 42),
@@ -112,7 +116,7 @@ namespace FolderLocker.UI.Views
 
             btnVolver = new Button
             {
-                Text = "⬅ Volver a Configuración",
+                Text = Localization.Get("cred_btn_back"),
                 Size = new Size(280, 48),
                 Location = new Point(350, 305),
                 BackColor = UITheme.cAccentRed,
@@ -127,6 +131,17 @@ namespace FolderLocker.UI.Views
             card.Controls.Add(btnVolver);
 
             Recentrar();
+        }
+
+        public void ActualizarIdioma()
+        {
+            if (lblBadge1 != null) lblBadge1.Text = Localization.Get("cred_badge_dev");
+            if (lblBadge2 != null) lblBadge2.Text = Localization.Get("cred_badge_suite");
+            if (lblTitulo != null) lblTitulo.Text = Localization.Get("cred_title");
+            if (lblDevInfo != null) lblDevInfo.Text = Localization.Get("cred_author_info");
+            if (lblVersion != null) lblVersion.Text = Localization.Get("cred_desc");
+            if (btnGitHub != null) btnGitHub.Text = Localization.Get("cred_btn_github");
+            if (btnVolver != null) btnVolver.Text = Localization.Get("cred_btn_back");
         }
 
         private static Label CrearBadge(string text, Color bg, Color fg, int x, int y)

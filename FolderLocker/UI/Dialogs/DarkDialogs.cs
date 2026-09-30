@@ -119,9 +119,7 @@ namespace FolderLocker
             int extraH = archivosJunkExcluidos > 0 ? 20 : 0;
             int w = 530;
             int h = (esVolumenGrande ? 465 : 445) + extraH;
-            string titulo = esVolumenGrande
-                ? (Localization.CurrentLang == "EN" ? "⚠️ Warning: Large File Volume" : "⚠️ Advertencia: Gran Volumen")
-                : (Localization.CurrentLang == "EN" ? "🛡️ Security Summary" : "🛡️ Resumen de Seguridad");
+            string titulo = Localization.Get(esVolumenGrande ? "prescan_title_warning" : "prescan_title_summary");
 
             using var form = CrearBase(titulo, w, h);
 
@@ -200,7 +198,7 @@ namespace FolderLocker
             pnlKpi1.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlKpi1.ClientRectangle, Color.FromArgb(50, 44, 44), ButtonBorderStyle.Solid);
             var lblKpi1Tag = new Label
             {
-                Text = "📄 " + (Localization.CurrentLang == "EN" ? "FILES" : "ARCHIVOS"),
+                Text = "📄 " + Localization.Get("prescan_lbl_files"),
                 Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(160, 150, 150),
                 Location = new Point(10, 8),
@@ -224,7 +222,7 @@ namespace FolderLocker
             pnlKpi2.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlKpi2.ClientRectangle, Color.FromArgb(50, 44, 44), ButtonBorderStyle.Solid);
             var lblKpi2Tag = new Label
             {
-                Text = "💾 " + (Localization.CurrentLang == "EN" ? "TOTAL SIZE" : "TAMAÑO TOTAL"),
+                Text = "💾 " + Localization.Get("prescan_lbl_size"),
                 Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(160, 150, 150),
                 Location = new Point(10, 8),
@@ -248,7 +246,7 @@ namespace FolderLocker
             pnlKpi3.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlKpi3.ClientRectangle, Color.FromArgb(50, 44, 44), ButtonBorderStyle.Solid);
             var lblKpi3Tag = new Label
             {
-                Text = "⏱️ " + (Localization.CurrentLang == "EN" ? "EST. TIME" : "TIEMPO EST."),
+                Text = "⏱️ " + Localization.Get("prescan_lbl_time"),
                 Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(160, 150, 150),
                 Location = new Point(10, 8),
@@ -285,19 +283,11 @@ namespace FolderLocker
                 e.Graphics.FillRectangle(b, 0, 0, 4, pnlBanner.Height);
             };
 
-            string textoBanner = esVolumenGrande
-                ? (Localization.CurrentLang == "EN"
-                    ? "⚠️ Notice: Large folder detected. The encryption process runs in transactional batches (Two-Phase Commit) to guarantee zero file loss."
-                    : "⚠️ Aviso: Gran volumen detectado. El cifrado se realizará en lotes transaccionales (Two-Phase Commit) para garantizar cero pérdida de datos.")
-                : (Localization.CurrentLang == "EN"
-                    ? "🛡️ Maximum Security: Folder will be protected with military AES-256 CTR encryption and authenticated integrity."
-                    : "🛡️ Máxima Seguridad: La carpeta será protegida con cifrado militar AES-256 CTR e integridad autenticada.");
+            string textoBanner = Localization.Get(esVolumenGrande ? "prescan_large_warning" : "prescan_normal_summary");
 
             if (archivosJunkExcluidos > 0)
             {
-                string infoJunk = Localization.CurrentLang == "EN"
-                    ? $"\n🧹 Smart Filter: {archivosJunkExcluidos:N0} temporary/lock file(s) excluded (thumbs.db, .tmp, etc.)"
-                    : $"\n🧹 Filtro Inteligente: {archivosJunkExcluidos:N0} archivo(s) temporal(es) excluido(s) para prevenir bloqueos.";
+                string infoJunk = string.Format(Localization.Get("prescan_junk_info"), archivosJunkExcluidos);
                 textoBanner += infoJunk;
             }
 
@@ -317,7 +307,7 @@ namespace FolderLocker
             int promptY = bannerY + bannerH + 12;
             var lblPrompt = new Label
             {
-                Text = Localization.CurrentLang == "EN" ? "Do you want to proceed with encryption?" : "¿Deseas iniciar la encriptación ahora?",
+                Text = Localization.Get("prescan_prompt"),
                 Font = new Font("Segoe UI Semibold", 9.5f),
                 ForeColor = Color.FromArgb(240, 240, 240),
                 Location = new Point(25, promptY),
@@ -331,7 +321,7 @@ namespace FolderLocker
             int btnY = promptY + 30;
             var btnSi = new Button
             {
-                Text = Localization.CurrentLang == "EN" ? "🔒 PROCEED ENCRYPTION" : "🔒 INICIAR CIFRADO",
+                Text = Localization.Get("prescan_btn_proceed"),
                 Location = new Point(25, btnY),
                 Size = new Size(250, 45),
                 FlatStyle = FlatStyle.Flat,
@@ -346,7 +336,7 @@ namespace FolderLocker
 
             var btnNo = new Button
             {
-                Text = Localization.CurrentLang == "EN" ? "CANCEL" : "CANCELAR",
+                Text = Localization.Get("btn_cancel"),
                 Location = new Point(285, btnY),
                 Size = new Size(220, 45),
                 FlatStyle = FlatStyle.Flat,

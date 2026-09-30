@@ -62,9 +62,7 @@ namespace FolderLocker.UI.Views
 
             lblSubtituloMontar = new Label
             {
-                Text = Localization.CurrentLang == "EN"
-                    ? "Mount your protected vaults as virtual hard drives on-the-fly without decrypting."
-                    : "Monta tus bóvedas como discos duros virtuales en tiempo real sin necesidad de desencriptar.",
+                Text = Localization.Get("sub_virtual_mount"),
                 ForeColor = Color.FromArgb(160, 150, 150),
                 Font = new Font("Segoe UI", 9.5f),
                 AutoSize = true
@@ -434,9 +432,7 @@ namespace FolderLocker.UI.Views
             // 5. Tip de ayuda al pie
             lblTip = new Label
             {
-                Text = Localization.CurrentLang == "EN"
-                    ? "💡 The virtual drive appears in Windows Explorer and encrypts seamlessly in real-time."
-                    : "💡 La unidad virtual aparecerá en Este Equipo y se cifra en tiempo real sin alterar el disco físico.",
+                Text = Localization.Get("tip_virtual_mount"),
                 Location = new Point(40, 410),
                 Size = new Size(600, 18),
                 ForeColor = Color.FromArgb(120, 110, 110),
@@ -534,7 +530,7 @@ namespace FolderLocker.UI.Views
             // Actualizar etiquetas de estado y contador
             if (_todasLasCarpetas.Count == 0)
             {
-                lblCountBovedas.Text = Localization.CurrentLang == "EN" ? "0 VAULTS" : "0 BÓVEDAS";
+                lblCountBovedas.Text = Localization.Get("count_vaults_zero");
                 lblCountBovedas.ForeColor = UITheme.cTextSecondary;
                 lblNoResults.Text = Localization.Get("lbl_no_vaults_available");
                 lblNoResults.Visible = true;
@@ -542,18 +538,16 @@ namespace FolderLocker.UI.Views
             }
             else if (string.IsNullOrEmpty(filtro))
             {
-                lblCountBovedas.Text = Localization.CurrentLang == "EN"
-                    ? $"{_todasLasCarpetas.Count} VAULT{(_todasLasCarpetas.Count != 1 ? "S" : "")}"
-                    : $"{_todasLasCarpetas.Count} BÓVEDA{(_todasLasCarpetas.Count != 1 ? "S" : "")}";
+                lblCountBovedas.Text = (_todasLasCarpetas.Count == 1)
+                    ? Localization.Get("count_vaults_one")
+                    : string.Format(Localization.Get("count_vaults_many"), _todasLasCarpetas.Count);
                 lblCountBovedas.ForeColor = UITheme.cTextSecondary;
                 lblNoResults.Visible = false;
             }
             else
             {
                 int encontrados = lstCarpetasParaMontar.Items.Count;
-                lblCountBovedas.Text = Localization.CurrentLang == "EN"
-                    ? $"{encontrados}/{_todasLasCarpetas.Count} FOUND"
-                    : $"{encontrados}/{_todasLasCarpetas.Count} ENCONTRADAS";
+                lblCountBovedas.Text = string.Format(Localization.Get("count_vaults_found"), encontrados, _todasLasCarpetas.Count);
                 lblCountBovedas.ForeColor = encontrados > 0 ? Color.FromArgb(74, 222, 128) : UITheme.cAccentRed;
 
                 if (encontrados == 0)
@@ -582,18 +576,14 @@ namespace FolderLocker.UI.Views
         public void ActualizarIdioma()
         {
             lblTituloMontar.Text = Localization.Get("title_virtual");
-            lblSubtituloMontar.Text = Localization.CurrentLang == "EN"
-                ? "Mount your protected vaults as virtual hard drives on-the-fly without decrypting."
-                : "Monta tus bóvedas como discos duros virtuales en tiempo real sin necesidad de desencriptar.";
+            lblSubtituloMontar.Text = Localization.Get("sub_virtual_mount");
             lblListaMontar.Text = Localization.Get("lbl_vaults").ToUpper();
             txtBuscarBoveda.PlaceholderText = Localization.Get("placeholder_search_vault") ?? "Buscar bóveda por nombre o ruta...";
             lblLetraMontar.Text = Localization.Get("lbl_drive").ToUpper();
             lblPassMontar.Text = Localization.Get("lbl_mount_pass").ToUpper();
             btnAccionMontar.Text = "💾 " + (Localization.Get("btn_mount") ?? "MONTAR COMO DISCO VIRTUAL");
             btnAccionDesmontar.Text = "⏏️ " + (Localization.Get("btn_unmount") ?? "DESMONTAR");
-            lblTip.Text = Localization.CurrentLang == "EN"
-                ? "💡 The virtual drive appears in Windows Explorer and encrypts seamlessly in real-time."
-                : "💡 La unidad virtual aparecerá en Este Equipo y se cifra en tiempo real sin alterar el disco físico.";
+            lblTip.Text = Localization.Get("tip_virtual_mount");
 
             FiltrarCarpetas(lstCarpetasParaMontar.SelectedItem?.ToString());
         }

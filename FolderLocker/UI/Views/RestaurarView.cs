@@ -91,9 +91,7 @@ namespace FolderLocker.UI.Views
 
             lblGarantia = new Label
             {
-                Text = Localization.CurrentLang == "EN"
-                    ? "⚡ Secure Decryption: Files and subdirectories will be completely restored to original format."
-                    : "⚡ Descifrado Seguro: Los archivos y subdirectorios volverán a su estado y formato original sin pérdidas.",
+                Text = Localization.Get("lbl_guarantee_decrypt"),
                 Location = new Point(40, 324),
                 Size = new Size(600, 20),
                 ForeColor = Color.FromArgb(120, 110, 110),
@@ -148,9 +146,7 @@ namespace FolderLocker.UI.Views
         {
             lblTituloRestaurar.Text = Localization.Get("lbl_path_protected").ToUpper();
             btnAccionRestaurar.Text = "🔓 " + (Localization.Get("btn_decrypt") ?? "RESTAURAR Y DESENCRIPTAR");
-            lblGarantia.Text = Localization.CurrentLang == "EN"
-                ? "⚡ Secure Decryption: Files and subdirectories will be completely restored to original format."
-                : "⚡ Descifrado Seguro: Los archivos y subdirectorios volverán a su estado y formato original sin pérdidas.";
+            lblGarantia.Text = Localization.Get("lbl_guarantee_decrypt");
         }
 
         protected override void OnResize(EventArgs e)

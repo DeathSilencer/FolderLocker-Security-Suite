@@ -30,7 +30,7 @@ namespace FolderLocker.UI.Views
         {
             lblTituloSetup = new Label
             {
-                Text = "WELCOME",
+                Text = Localization.Get("setup_title"),
                 ForeColor = UITheme.cAccentRed,
                 Font = new Font("Segoe UI Black", 24, FontStyle.Bold),
                 AutoSize = true,
@@ -41,7 +41,7 @@ namespace FolderLocker.UI.Views
             card = UITheme.CrearTarjetaBase(550, 480);
             this.Controls.Add(card);
 
-            lblIdiomaSetup = UITheme.CrearEtiqueta(card, "IDIOMA", 45, 30);
+            lblIdiomaSetup = UITheme.CrearEtiqueta(card, Localization.Get("config_lbl_lang").ToUpper(), 45, 30);
 
             cmbLangSetup = new ComboBox
             {
@@ -147,6 +147,8 @@ namespace FolderLocker.UI.Views
 
         public void ActualizarIdioma()
         {
+            lblTituloSetup.Text = Localization.Get("setup_title");
+            lblIdiomaSetup.Text = Localization.Get("config_lbl_lang").ToUpper();
             lblSubSetup.Text = Localization.Get("setup_sub");
             lblCreateSetup.Text = Localization.Get("setup_lbl_create").ToUpper();
             lblConfirmSetup.Text = Localization.Get("setup_lbl_confirm").ToUpper();

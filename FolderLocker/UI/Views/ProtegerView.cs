@@ -89,7 +89,7 @@ namespace FolderLocker.UI.Views
 
             lblDropHint = new Label
             {
-                Text = Localization.CurrentLang == "EN" ? "(Drag & drop folder here or browse)" : "(Arrastra y suelta aquí o examina)",
+                Text = Localization.Get("lbl_drop_hint"),
                 Location = new Point(320, 57),
                 ForeColor = Color.FromArgb(140, 130, 130),
                 AutoSize = true,
@@ -245,9 +245,7 @@ namespace FolderLocker.UI.Views
 
             lblPassHint = new Label
             {
-                Text = Localization.CurrentLang == "EN"
-                    ? "🛡️ Encryption keys are generated locally. Your password is never stored in plain text."
-                    : "🛡️ Las llaves se generan localmente con Argon2id. Tu contraseña nunca se almacena en texto plano.",
+                Text = Localization.Get("lbl_pass_hint"),
                 Location = new Point(40, 222),
                 ForeColor = Color.FromArgb(130, 120, 120),
                 AutoSize = true,
@@ -275,9 +273,7 @@ namespace FolderLocker.UI.Views
             // Pie de garantía atómica
             lblGarantia = new Label
             {
-                Text = Localization.CurrentLang == "EN"
-                    ? "⚡ Atomic Protection: Interrupted operations roll back cleanly without corrupted files."
-                    : "⚡ Protección Atómica: Operaciones transaccionales. Cero corrupción ante cortes o apagones.",
+                Text = Localization.Get("lbl_guarantee_atomic"),
                 Location = new Point(40, 324),
                 Size = new Size(600, 20),
                 ForeColor = Color.FromArgb(120, 110, 110),
@@ -357,13 +353,9 @@ namespace FolderLocker.UI.Views
             lblPassProteger.Text = Localization.Get("lbl_pass").ToUpper();
             btnOlvide.Text = Localization.Get("link_forgot");
             btnAccionGuardar.Text = "🔒 " + (Localization.Get("btn_lock") ?? "BLOQUEAR / CIFRAR CARPETA");
-            lblDropHint.Text = Localization.CurrentLang == "EN" ? "(Drag & drop folder here or browse)" : "(Arrastra y suelta aquí o examina)";
-            lblPassHint.Text = Localization.CurrentLang == "EN"
-                ? "🛡️ Encryption keys are generated locally. Your password is never stored in plain text."
-                : "🛡️ Las llaves se generan localmente con Argon2id. Tu contraseña nunca se almacena en texto plano.";
-            lblGarantia.Text = Localization.CurrentLang == "EN"
-                ? "⚡ Atomic Protection: Interrupted operations roll back cleanly without corrupted files."
-                : "⚡ Protección Atómica: Operaciones transaccionales. Cero corrupción ante cortes o apagones.";
+            lblDropHint.Text = Localization.Get("lbl_drop_hint");
+            lblPassHint.Text = Localization.Get("lbl_pass_hint");
+            lblGarantia.Text = Localization.Get("lbl_guarantee_atomic");
         }
 
         protected override void OnResize(EventArgs e)

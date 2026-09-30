@@ -70,9 +70,7 @@ namespace FolderLocker.UI.Views
 
             lblSubtituloConfig = new Label
             {
-                Text = Localization.CurrentLang == "EN"
-                    ? "Manage language settings, system startup, and local cryptographic database."
-                    : "Administra el idioma de la aplicación, el arranque del sistema y los datos criptográficos locales.",
+                Text = Localization.Get("cfg_sub"),
                 ForeColor = Color.FromArgb(160, 150, 150),
                 Font = new Font("Segoe UI", 9.5f),
                 AutoSize = true
@@ -95,8 +93,8 @@ namespace FolderLocker.UI.Views
 
             // Badges superiores
             int badgeY = 18;
-            var badge1 = CrearBadge("⚙ PREFERENCIAS DEL SISTEMA", Color.FromArgb(50, 22, 22), Color.FromArgb(252, 165, 165), 40, badgeY);
-            var badge2 = CrearBadge("🔒 SEGURIDAD LOCAL", Color.FromArgb(36, 33, 33), Color.FromArgb(209, 213, 219), 245, badgeY);
+            var badge1 = CrearBadge(Localization.Get("cfg_badge_system"), Color.FromArgb(50, 22, 22), Color.FromArgb(252, 165, 165), 40, badgeY);
+            var badge2 = CrearBadge(Localization.Get("cfg_badge_security"), Color.FromArgb(36, 33, 33), Color.FromArgb(209, 213, 219), 245, badgeY);
             card.Controls.AddRange(new Control[] { badge1, badge2 });
 
             // 1. Sección: Idioma
@@ -173,7 +171,7 @@ namespace FolderLocker.UI.Views
 
             lblStartupTitle = new Label
             {
-                Text = Localization.CurrentLang == "EN" ? "Start with Windows" : "Iniciar con Windows",
+                Text = Localization.Get("cfg_startup_title"),
                 Location = new Point(46, 6),
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
@@ -184,9 +182,7 @@ namespace FolderLocker.UI.Views
 
             lblStartupSub = new Label
             {
-                Text = Localization.CurrentLang == "EN"
-                    ? "Launch FolderLocker minimized in the background on startup."
-                    : "Ejecutar FolderLocker minimizado en la bandeja al encender el equipo.",
+                Text = Localization.Get("cfg_startup_sub"),
                 Location = new Point(46, 26),
                 ForeColor = Color.FromArgb(150, 140, 140),
                 Font = new Font("Segoe UI", 8),
@@ -233,7 +229,7 @@ namespace FolderLocker.UI.Views
 
             lblJunkTitle = new Label
             {
-                Text = Localization.CurrentLang == "EN" ? "Junk / Temp File Filter" : "Filtro de Archivos Innecesarios",
+                Text = Localization.Get("cfg_junk_title"),
                 Location = new Point(46, 6),
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
@@ -244,9 +240,7 @@ namespace FolderLocker.UI.Views
 
             lblJunkSub = new Label
             {
-                Text = Localization.CurrentLang == "EN"
-                    ? "Skip and clean thumbs.db, desktop.ini, .tmp and temporary locks."
-                    : "Omitir y sanear archivos thumbs.db, desktop.ini, .tmp y bloqueos temporales.",
+                Text = Localization.Get("cfg_junk_sub"),
                 Location = new Point(46, 26),
                 ForeColor = Color.FromArgb(150, 140, 140),
                 Font = new Font("Segoe UI", 8),
@@ -288,7 +282,7 @@ namespace FolderLocker.UI.Views
 
             lblAutoLockTitle = new Label
             {
-                Text = Localization.Get("cfg_autolock_title") ?? (Localization.CurrentLang == "EN" ? "Inactivity Auto-Lock" : "Auto-Bloqueo por Inactividad"),
+                Text = Localization.Get("cfg_autolock_title"),
                 Location = new Point(46, 6),
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
@@ -299,9 +293,7 @@ namespace FolderLocker.UI.Views
 
             lblAutoLockSub = new Label
             {
-                Text = Localization.Get("cfg_autolock_sub") ?? (Localization.CurrentLang == "EN"
-                    ? "Lock session and unmount virtual drives after idle time."
-                    : "Bloquear sesión y cerrar unidades tras tiempo inactivo."),
+                Text = Localization.Get("cfg_autolock_sub"),
                 Location = new Point(46, 26),
                 ForeColor = Color.FromArgb(150, 140, 140),
                 Font = new Font("Segoe UI", 8),
@@ -372,7 +364,7 @@ namespace FolderLocker.UI.Views
 
             lblDangerTitle = new Label
             {
-                Text = Localization.CurrentLang == "EN" ? "Factory Reset" : "Restablecimiento de Fábrica",
+                Text = Localization.Get("cfg_danger_title"),
                 Location = new Point(46, 7),
                 ForeColor = Color.FromArgb(254, 202, 202),
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
@@ -383,9 +375,7 @@ namespace FolderLocker.UI.Views
 
             lblDangerSub = new Label
             {
-                Text = Localization.CurrentLang == "EN"
-                    ? "Deletes local user database and restores the suite to initial state."
-                    : "Elimina la base de datos de usuarios local y restablece la suite.",
+                Text = Localization.Get("cfg_danger_sub"),
                 Location = new Point(46, 27),
                 ForeColor = Color.FromArgb(200, 180, 180),
                 Font = new Font("Segoe UI", 8),
@@ -396,7 +386,7 @@ namespace FolderLocker.UI.Views
 
             btnReset = new Button
             {
-                Text = Localization.CurrentLang == "EN" ? "RESET" : "RESTABLECER",
+                Text = Localization.Get("cfg_btn_reset_label"),
                 Location = new Point(450, 8),
                 Size = new Size(136, 34),
                 FlatStyle = FlatStyle.Flat,
@@ -414,7 +404,7 @@ namespace FolderLocker.UI.Views
             // 4. Sección: Acerca de y Créditos
             lblSecDev = new Label
             {
-                Text = "ACERCA DE Y CRÉDITOS",
+                Text = Localization.Get("cfg_sec_dev"),
                 Location = new Point(40, 392),
                 ForeColor = UITheme.cTextSecondary,
                 AutoSize = true,
@@ -453,7 +443,7 @@ namespace FolderLocker.UI.Views
 
             lblDevSub = new Label
             {
-                Text = "Desarrollado con Dokan & AES-256 CTR • Arquitectura de Cifrado Atómico",
+                Text = Localization.Get("cfg_dev_sub"),
                 Location = new Point(46, 27),
                 ForeColor = Color.FromArgb(150, 140, 140),
                 Font = new Font("Segoe UI", 8),
@@ -464,7 +454,7 @@ namespace FolderLocker.UI.Views
 
             btnCreditos = new Button
             {
-                Text = Localization.CurrentLang == "EN" ? "CREDITS" : "CRÉDITOS",
+                Text = Localization.Get("cfg_btn_credits_label"),
                 Location = new Point(450, 9),
                 Size = new Size(136, 32),
                 FlatStyle = FlatStyle.Flat,
@@ -482,7 +472,7 @@ namespace FolderLocker.UI.Views
             // Pie
             lblFooter = new Label
             {
-                Text = "FolderLocker Security Suite • Build 2026.1 • Suite Criptográfica Segura",
+                Text = Localization.Get("cfg_footer_label"),
                 Location = new Point(40, 474),
                 Size = new Size(600, 20),
                 ForeColor = Color.FromArgb(110, 100, 100),
@@ -540,32 +530,16 @@ namespace FolderLocker.UI.Views
             if (cmbAutoLock == null) return;
             int currentMin = Properties.Settings.Default.AutoLockMinutos;
             cmbAutoLock.Items.Clear();
-            if (Localization.CurrentLang == "EN")
+            cmbAutoLock.Items.AddRange(new object[]
             {
-                cmbAutoLock.Items.AddRange(new object[]
-                {
-                    "Disabled",
-                    "1 minute (Test)",
-                    "3 minutes",
-                    "5 minutes (Recommended)",
-                    "10 minutes",
-                    "15 minutes",
-                    "30 minutes"
-                });
-            }
-            else
-            {
-                cmbAutoLock.Items.AddRange(new object[]
-                {
-                    "Desactivado",
-                    "1 minuto (Prueba)",
-                    "3 minutos",
-                    "5 minutos (Recomendado)",
-                    "10 minutos",
-                    "15 minutos",
-                    "30 minutos"
-                });
-            }
+                Localization.Get("opt_autolock_disabled"),
+                Localization.Get("opt_autolock_1min"),
+                Localization.Get("opt_autolock_3min"),
+                Localization.Get("opt_autolock_5min"),
+                Localization.Get("opt_autolock_10min"),
+                Localization.Get("opt_autolock_15min"),
+                Localization.Get("opt_autolock_30min")
+            });
 
             int[] minutesMap = { 0, 1, 3, 5, 10, 15, 30 };
             int sel = Array.IndexOf(minutesMap, currentMin);
@@ -575,34 +549,27 @@ namespace FolderLocker.UI.Views
         public void ActualizarIdioma()
         {
             lblTituloConfig.Text = Localization.Get("menu_config") ?? "CONFIGURACIÓN";
-            lblSubtituloConfig.Text = Localization.CurrentLang == "EN"
-                ? "Manage language settings, system startup, and local cryptographic database."
-                : "Administra el idioma de la aplicación, el arranque del sistema y los datos criptográficos locales.";
+            lblSubtituloConfig.Text = Localization.Get("cfg_sub");
             lblSecGeneral.Text = (Localization.Get("cfg_sec_general") ?? "IDIOMA Y REGIÓN").ToUpper();
             lblSecSystem.Text = (Localization.Get("cfg_sec_system") ?? "SISTEMA Y ARRANQUE").ToUpper();
             lblSecData.Text = (Localization.Get("cfg_sec_data") ?? "ZONA DE DATOS LOCALES").ToUpper();
-            lblStartupTitle.Text = Localization.CurrentLang == "EN" ? "Start with Windows" : "Iniciar con Windows";
-            lblStartupSub.Text = Localization.CurrentLang == "EN"
-                ? "Launch FolderLocker minimized in the background on startup."
-                : "Ejecutar FolderLocker minimizado en la bandeja al encender el equipo.";
-            lblJunkTitle.Text = Localization.CurrentLang == "EN" ? "Junk / Temp File Filter" : "Filtro de Archivos Innecesarios";
-            lblJunkSub.Text = Localization.CurrentLang == "EN"
-                ? "Skip and clean thumbs.db, desktop.ini, .tmp and temporary locks."
-                : "Omitir y sanear archivos thumbs.db, desktop.ini, .tmp y bloqueos temporales.";
+            lblStartupTitle.Text = Localization.Get("cfg_startup_title");
+            lblStartupSub.Text = Localization.Get("cfg_startup_sub");
+            lblJunkTitle.Text = Localization.Get("cfg_junk_title");
+            lblJunkSub.Text = Localization.Get("cfg_junk_sub");
             if (lblAutoLockTitle != null)
             {
-                lblAutoLockTitle.Text = Localization.Get("cfg_autolock_title") ?? (Localization.CurrentLang == "EN" ? "Inactivity Auto-Lock" : "Auto-Bloqueo por Inactividad");
-                lblAutoLockSub.Text = Localization.Get("cfg_autolock_sub") ?? (Localization.CurrentLang == "EN"
-                    ? "Lock session and unmount virtual drives after idle time."
-                    : "Bloquear sesión y cerrar unidades tras tiempo inactivo.");
+                lblAutoLockTitle.Text = Localization.Get("cfg_autolock_title");
+                lblAutoLockSub.Text = Localization.Get("cfg_autolock_sub");
                 PoblarComboAutoLock();
             }
-            lblDangerTitle.Text = Localization.CurrentLang == "EN" ? "Factory Reset" : "Restablecimiento de Fábrica";
-            lblDangerSub.Text = Localization.CurrentLang == "EN"
-                ? "Deletes local user database and restores the suite to initial state."
-                : "Elimina la base de datos de usuarios local y restablece la suite.";
-            btnReset.Text = Localization.CurrentLang == "EN" ? "RESET" : "RESTABLECER";
-            btnCreditos.Text = Localization.CurrentLang == "EN" ? "CREDITS" : "CRÉDITOS";
+            lblDangerTitle.Text = Localization.Get("cfg_danger_title");
+            lblDangerSub.Text = Localization.Get("cfg_danger_sub");
+            btnReset.Text = Localization.Get("cfg_btn_reset_label");
+            if (lblSecDev != null) lblSecDev.Text = Localization.Get("cfg_sec_dev");
+            if (lblDevSub != null) lblDevSub.Text = Localization.Get("cfg_dev_sub");
+            btnCreditos.Text = Localization.Get("cfg_btn_credits_label");
+            if (lblFooter != null) lblFooter.Text = Localization.Get("cfg_footer_label");
             SincronizarIdiomaCombo();
         }
 

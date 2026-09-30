@@ -165,7 +165,7 @@ namespace FolderLocker
 
             _inactivityService.ResetTimer();
             SecurityAuditLogger.LogSecurity("USER_LOGIN", "Inicio de Sesión", true, $"Usuario '{user.Username}' autenticado correctamente.");
-            DarkDialogs.ShowInfo(string.Format(Localization.Get("login_welcome"), user.Username), "Bienvenido", this);
+            DarkDialogs.ShowInfo(string.Format(Localization.Get("login_welcome"), user.Username), Localization.Get("title_welcome"), this);
         }
 
         #endregion
@@ -176,13 +176,13 @@ namespace FolderLocker
         {
             if (_estaProcesando)
             {
-                DarkDialogs.ShowInfo("Ya hay una operación de cifrado en curso. Por favor espera a que finalice.", "Operación en Curso", this);
+                DarkDialogs.ShowInfo(Localization.Get("msg_busy_operation"), Localization.Get("title_busy"), this);
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(ruta))
             {
-                DarkDialogs.ShowInfo(Localization.Get("msg_select_dir"), "Info", this);
+                DarkDialogs.ShowInfo(Localization.Get("msg_select_dir"), Localization.Get("title_info"), this);
                 return;
             }
 
@@ -198,7 +198,7 @@ namespace FolderLocker
             var scan = _protectionService.ScanFolder(ruta);
             if (scan.TotalFiles == 0)
             {
-                DarkDialogs.ShowInfo("La carpeta está vacía o no contiene archivos válidos para proteger.", "Carpeta vacía", this);
+                DarkDialogs.ShowInfo(Localization.Get("msg_empty_folder"), Localization.Get("title_empty_folder"), this);
                 return;
             }
 
@@ -206,7 +206,7 @@ namespace FolderLocker
             var validacion = _protectionService.ValidateCanProtect(ruta, _vaultService);
             if (!validacion.IsValid)
             {
-                DarkDialogs.ShowInfo(validacion.ErrorMessage, "Validación de Seguridad", this);
+                DarkDialogs.ShowInfo(validacion.ErrorMessage, Localization.Get("title_security_validation"), this);
                 return;
             }
 
@@ -252,13 +252,13 @@ namespace FolderLocker
                 CerrarBarraProgreso();
                 SecurityAuditLogger.LogWarning("PROTECT_CANCELLED", "Protección de carpeta cancelada por el usuario", ruta);
                 RestaurarVentana();
-                DarkDialogs.ShowInfo(Localization.Get("msg_op_cancelled") ?? "La operación de cifrado fue cancelada por el usuario. Los archivos pendientes no fueron modificados.", "Operación Cancelada", this);
+                DarkDialogs.ShowInfo(Localization.Get("msg_op_cancelled") ?? "La operación de cifrado fue cancelada por el usuario. Los archivos pendientes no fueron modificados.", Localization.Get("title_confirm_cancel"), this);
             }
             catch (Exception ex)
             {
                 CerrarBarraProgreso();
                 SecurityAuditLogger.LogError("PROTECT_ERROR", "Error inesperado al proteger carpeta", ex, ruta);
-                DarkDialogs.ShowInfo("Error al proteger carpeta: " + ex.Message, "Error Crítico", this);
+                DarkDialogs.ShowInfo(Localization.Get("err_protect_failed") + ": " + ex.Message, Localization.Get("title_critical_error"), this);
             }
             finally
             {
@@ -275,20 +275,20 @@ namespace FolderLocker
         {
             if (_estaProcesando)
             {
-                DarkDialogs.ShowInfo("Ya hay una operación en curso. Por favor espera a que finalice.", "Operación en Curso", this);
+                DarkDialogs.ShowInfo(Localization.Get("msg_busy_operation"), Localization.Get("title_busy"), this);
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(rutaSeleccionada))
             {
-                DarkDialogs.ShowInfo(Localization.Get("msg_select_restore"), "Info", this);
+                DarkDialogs.ShowInfo(Localization.Get("msg_select_restore"), Localization.Get("title_info"), this);
                 return;
             }
 
             var validacion = _protectionService.ValidateCanRestore(rutaSeleccionada, _vaultService);
             if (!validacion.IsValid)
             {
-                DarkDialogs.ShowInfo(validacion.ErrorMessage, "Validación de Restauración", this);
+                DarkDialogs.ShowInfo(validacion.ErrorMessage, Localization.Get("title_restore_validation"), this);
                 return;
             }
 
@@ -338,13 +338,13 @@ namespace FolderLocker
                     CerrarBarraProgreso();
                     SecurityAuditLogger.LogWarning("RESTORE_CANCELLED", "Restauración cancelada por el usuario", rutaSeleccionada);
                     RestaurarVentana();
-                    DarkDialogs.ShowInfo(Localization.Get("msg_op_cancelled") ?? "La operación de restauración fue cancelada por el usuario.", "Operación Cancelada", this);
+                    DarkDialogs.ShowInfo(Localization.Get("msg_op_cancelled") ?? "La operación de restauración fue cancelada por el usuario.", Localization.Get("title_confirm_cancel"), this);
                 }
                 catch (Exception ex)
                 {
                     CerrarBarraProgreso();
                     SecurityAuditLogger.LogError("RESTORE_ERROR", "Error inesperado al restaurar carpeta", ex, rutaSeleccionada);
-                    DarkDialogs.ShowInfo("Error al restaurar: " + ex.Message, "Error Crítico", this);
+                    DarkDialogs.ShowInfo(Localization.Get("err_restore_failed") + ": " + ex.Message, Localization.Get("title_critical_error"), this);
                 }
                 finally
                 {
@@ -408,7 +408,7 @@ namespace FolderLocker
             progresoActivo.OnCancelarRequested += (s, args) =>
             {
                 string msg = Localization.Get("prog_confirm_cancel") ?? "¿Deseas cancelar la operación en curso?\n\nLos archivos procesados hasta ahora se mantendrán protegidos.";
-                if (DarkDialogs.ShowConfirm(msg, Localization.Get("title_confirm") ?? "Confirmar Cancelación", progresoActivo) == DialogResult.Yes)
+                if (DarkDialogs.ShowConfirm(msg, Localization.Get("title_confirm_cancel"), progresoActivo) == DialogResult.Yes)
                 {
                     _operacionPauseEvent.Set(); // Desbloquear si estaba pausado
                     _operacionCts?.Cancel();
@@ -441,13 +441,13 @@ namespace FolderLocker
         {
             if (string.IsNullOrEmpty(rutaSeleccionada))
             {
-                DarkDialogs.ShowInfo(Localization.Get("msg_mount_select"), "Info", this);
+                DarkDialogs.ShowInfo(Localization.Get("msg_mount_select"), Localization.Get("title_info"), this);
                 return;
             }
 
             if (_estaProcesando)
             {
-                DarkDialogs.ShowInfo("Hay una operación de cifrado en curso en el sistema. Por seguridad, espera a que termine antes de montar unidades virtuales.", "Sistema Ocupado", this);
+                DarkDialogs.ShowInfo(Localization.Get("msg_cant_mount_busy"), Localization.Get("title_system_busy"), this);
                 return;
             }
 
@@ -469,7 +469,7 @@ namespace FolderLocker
 
             if (!_vaultService.Mount(rutaSeleccionada, letraDeseada, password, out string errorMessage))
             {
-                DarkDialogs.ShowInfo(errorMessage, "Error al Montar", this);
+                DarkDialogs.ShowInfo(errorMessage, Localization.Get("title_mount_error"), this);
                 return;
             }
 
@@ -486,7 +486,7 @@ namespace FolderLocker
         {
             if (string.IsNullOrEmpty(rutaSeleccionada))
             {
-                DarkDialogs.ShowInfo(Localization.Get("msg_mount_select"), "Info", this);
+                DarkDialogs.ShowInfo(Localization.Get("msg_mount_select"), Localization.Get("title_info"), this);
                 return;
             }
 
@@ -526,7 +526,7 @@ namespace FolderLocker
             else
             {
                 ActualizarYMostrarPanelMontar();
-                DarkDialogs.ShowInfo(Localization.Get("msg_no_vault"), "Info", this);
+                DarkDialogs.ShowInfo(Localization.Get("msg_no_vault"), Localization.Get("title_info"), this);
             }
         }
 
@@ -546,7 +546,7 @@ namespace FolderLocker
         {
             if (_estaProcesando)
             {
-                DarkDialogs.ShowInfo("Hay una operación de cifrado o descifrado en curso.\n\nPor seguridad para evitar la corrupción de archivos, espera a que finalice.", "Operación en Curso", this);
+                DarkDialogs.ShowInfo(Localization.Get("msg_cant_action_busy"), Localization.Get("title_busy"), this);
                 return;
             }
 
@@ -560,7 +560,7 @@ namespace FolderLocker
         {
             if (_estaProcesando)
             {
-                DarkDialogs.ShowInfo("No puedes cerrar sesión mientras se estén procesando archivos.", "Operación en Curso", this);
+                DarkDialogs.ShowInfo(Localization.Get("msg_cant_logout_busy"), Localization.Get("title_busy"), this);
                 return;
             }
 
@@ -607,7 +607,7 @@ namespace FolderLocker
         {
             if (_estaProcesando)
             {
-                DarkDialogs.ShowInfo("No puedes restablecer datos mientras se estén procesando archivos.", "Operación en Curso", this);
+                DarkDialogs.ShowInfo(Localization.Get("msg_cant_reset_busy"), Localization.Get("title_busy"), this);
                 return;
             }
 
@@ -665,7 +665,7 @@ namespace FolderLocker
             // Seguridad: Bloquear cierre si hay proceso activo
             if (_estaProcesando)
             {
-                DarkDialogs.ShowInfo("Hay una operación de cifrado o descifrado en curso.\n\nPor seguridad para evitar daños o pérdida de datos, no puedes cerrar la aplicación hasta que termine.", "Operación en Curso", this);
+                DarkDialogs.ShowInfo(Localization.Get("msg_cant_close_busy"), Localization.Get("title_busy"), this);
                 e.Cancel = true;
                 return;
             }
@@ -699,7 +699,7 @@ namespace FolderLocker
         {
             if (_estaProcesando)
             {
-                DarkDialogs.ShowInfo("No puedes agregar otra carpeta mientras hay una operación de cifrado en curso.", "Sistema Ocupado", this);
+                DarkDialogs.ShowInfo(Localization.Get("msg_cant_add_busy"), Localization.Get("title_system_busy"), this);
                 return;
             }
 
