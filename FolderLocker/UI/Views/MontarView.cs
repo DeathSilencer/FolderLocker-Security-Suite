@@ -5,19 +5,28 @@ namespace FolderLocker.UI.Views
     public class MontarView : UserControl
     {
         private Label lblTituloMontar = null!;
+        private Label lblSubtituloMontar = null!;
         private Panel card = null!;
         private Label lblListaMontar = null!;
         private ListBox lstCarpetasParaMontar = null!;
         private Label lblLetraMontar = null!;
-        private ComboBox cmbLetraMontar = null!;
+        private FlowLayoutPanel pnlLetrasChips = null!;
         private Label lblPassMontar = null!;
+        private Panel pnlPassGroup = null!;
         private TextBox txtPassMontar = null!;
+        private Button btnEye = null!;
         private Button btnAccionMontar = null!;
         private Button btnAccionDesmontar = null!;
+        private Label lblTip = null!;
+
+        private string _letraSeleccionada = "M:\\";
+        private readonly List<Button> _chipButtons = new();
+        private bool _passFocused = false;
 
         public string? CarpetaSeleccionada => lstCarpetasParaMontar.SelectedItem?.ToString();
-        public string LetraSeleccionada => cmbLetraMontar.Text;
+        public string LetraSeleccionada => _letraSeleccionada;
         public string Password => txtPassMontar.Text;
+        public Panel CardPanel => card;
 
         public event Action<string, string, string>? MontarRequested;
         public event Action<string>? DesmontarRequested;
@@ -34,70 +43,216 @@ namespace FolderLocker.UI.Views
             lblTituloMontar = new Label
             {
                 Text = Localization.Get("title_virtual"),
-                ForeColor = UITheme.cAccentRed,
-                Font = new Font("Segoe UI Black", 20, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(50, 30)
+                ForeColor = UITheme.cTextPrimary,
+                Font = new Font("Segoe UI Semibold", 20, FontStyle.Bold),
+                AutoSize = true
             };
             this.Controls.Add(lblTituloMontar);
 
-            card = UITheme.CrearTarjetaBase(550, 420);
+            lblSubtituloMontar = new Label
+            {
+                Text = Localization.CurrentLang == "EN"
+                    ? "Mount your protected vaults as virtual hard drives on-the-fly without decrypting."
+                    : "Monta tus bóvedas como discos duros virtuales en tiempo real sin necesidad de desencriptar.",
+                ForeColor = Color.FromArgb(160, 150, 150),
+                Font = new Font("Segoe UI", 9.5f),
+                AutoSize = true
+            };
+            this.Controls.Add(lblSubtituloMontar);
+
+            // Tarjeta principal (680 x 430)
+            card = new Panel
+            {
+                Size = new Size(680, 430),
+                BackColor = UITheme.cSurface
+            };
+            card.Paint += (s, e) =>
+            {
+                ControlPaint.DrawBorder(e.Graphics, card.ClientRectangle, UITheme.cBorder, ButtonBorderStyle.Solid);
+                using var b = new SolidBrush(UITheme.cAccentRed);
+                e.Graphics.FillRectangle(b, 0, 0, card.Width, 3);
+            };
             this.Controls.Add(card);
 
-            lblListaMontar = UITheme.CrearEtiqueta(card, Localization.Get("lbl_vaults"), 40, 30);
+            // Badges superiores
+            int badgeY = 18;
+            var badge1 = CrearBadge("💾 DOKAN VIRTUAL DISK", Color.FromArgb(50, 22, 22), Color.FromArgb(252, 165, 165), 40, badgeY);
+            var badge2 = CrearBadge("⚡ ON-THE-FLY ACCESS", Color.FromArgb(36, 33, 33), Color.FromArgb(209, 213, 219), 215, badgeY);
+            var badge3 = CrearBadge("🔒 AES-256 CTR", Color.FromArgb(36, 33, 33), Color.FromArgb(209, 213, 219), 375, badgeY);
+            card.Controls.AddRange(new Control[] { badge1, badge2, badge3 });
+
+            // 1. Selector de Bóvedas
+            lblListaMontar = new Label
+            {
+                Text = Localization.Get("lbl_vaults").ToUpper(),
+                Location = new Point(40, 56),
+                ForeColor = UITheme.cTextSecondary,
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8, FontStyle.Bold)
+            };
+            card.Controls.Add(lblListaMontar);
 
             lstCarpetasParaMontar = new ListBox
             {
-                Location = new Point(40, 55),
-                Size = new Size(470, 100),
+                Location = new Point(40, 80),
+                Size = new Size(600, 100),
                 BackColor = UITheme.cInputBackground,
-                ForeColor = UITheme.cTextPrimary,
+                ForeColor = Color.White,
                 BorderStyle = BorderStyle.FixedSingle,
-                Font = new Font("Segoe UI", 10)
+                Font = new Font("Segoe UI", 10),
+                DrawMode = DrawMode.OwnerDrawFixed,
+                ItemHeight = 32
+            };
+            lstCarpetasParaMontar.DrawItem += (s, e) =>
+            {
+                if (e.Index < 0 || e.Index >= lstCarpetasParaMontar.Items.Count) return;
+                bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+                Color bg = isSelected ? Color.FromArgb(52, 24, 24) : UITheme.cInputBackground;
+                Color fg = isSelected ? Color.White : Color.FromArgb(210, 210, 210);
+
+                using (var b = new SolidBrush(bg)) e.Graphics.FillRectangle(b, e.Bounds);
+                if (isSelected)
+                {
+                    using var ab = new SolidBrush(UITheme.cAccentRed);
+                    e.Graphics.FillRectangle(ab, e.Bounds.X, e.Bounds.Y, 3, e.Bounds.Height);
+                }
+
+                string itemText = "🔒 " + (lstCarpetasParaMontar.Items[e.Index]?.ToString() ?? "");
+                using (var tb = new SolidBrush(fg))
+                {
+                    e.Graphics.DrawString(itemText, isSelected ? new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold) : new Font("Segoe UI", 9.5f), tb, e.Bounds.X + 8, e.Bounds.Y + 6);
+                }
             };
             card.Controls.Add(lstCarpetasParaMontar);
 
-            lblLetraMontar = UITheme.CrearEtiqueta(card, Localization.Get("lbl_drive"), 40, 170);
-
-            cmbLetraMontar = new ComboBox
+            // 2. Chips para Letra de Unidad Virtual
+            lblLetraMontar = new Label
             {
-                Location = new Point(40, 195),
-                Size = new Size(100, 30),
-                FlatStyle = FlatStyle.Flat,
+                Text = Localization.Get("lbl_drive").ToUpper(),
+                Location = new Point(40, 192),
+                ForeColor = UITheme.cTextSecondary,
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8, FontStyle.Bold)
+            };
+            card.Controls.Add(lblLetraMontar);
+
+            pnlLetrasChips = new FlowLayoutPanel
+            {
+                Location = new Point(40, 214),
+                Size = new Size(600, 36),
+                BackColor = Color.Transparent,
+                Margin = new Padding(0),
+                Padding = new Padding(0)
+            };
+
+            string savedLetter = Properties.Settings.Default.LetraGuardada;
+            _letraSeleccionada = string.IsNullOrEmpty(savedLetter) ? "M:\\" : savedLetter;
+            string[] letras = { "M:\\", "Z:\\", "X:\\", "W:\\", "L:\\", "K:\\", "J:\\" };
+
+            foreach (var l in letras)
+            {
+                var chip = new Button
+                {
+                    Text = l,
+                    Size = new Size(54, 34),
+                    FlatStyle = FlatStyle.Flat,
+                    Cursor = Cursors.Hand,
+                    Tag = l,
+                    Margin = new Padding(0, 0, 8, 0)
+                };
+                chip.FlatAppearance.BorderSize = 0;
+                chip.Click += (s, e) =>
+                {
+                    _letraSeleccionada = l;
+                    Properties.Settings.Default.LetraGuardada = l;
+                    Properties.Settings.Default.Save();
+                    ActualizarEstiloChips();
+                };
+                _chipButtons.Add(chip);
+                pnlLetrasChips.Controls.Add(chip);
+            }
+            ActualizarEstiloChips();
+            card.Controls.Add(pnlLetrasChips);
+
+            // 3. Contraseña de Montaje
+            lblPassMontar = new Label
+            {
+                Text = Localization.Get("lbl_mount_pass").ToUpper(),
+                Location = new Point(40, 260),
+                ForeColor = UITheme.cTextSecondary,
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8, FontStyle.Bold)
+            };
+            card.Controls.Add(lblPassMontar);
+
+            pnlPassGroup = new Panel
+            {
+                Location = new Point(40, 280),
+                Size = new Size(600, 42),
+                BackColor = UITheme.cInputBackground
+            };
+            pnlPassGroup.Paint += (s, e) =>
+            {
+                Color borderColor = _passFocused ? UITheme.cAccentRed : Color.FromArgb(52, 47, 47);
+                ControlPaint.DrawBorder(e.Graphics, pnlPassGroup.ClientRectangle, borderColor, ButtonBorderStyle.Solid);
+            };
+
+            var lblPassIcon = new Label
+            {
+                Text = "🔑",
+                Location = new Point(10, 10),
+                Size = new Size(26, 24),
+                Font = new Font("Segoe UI", 12),
+                ForeColor = Color.White,
+                BackColor = Color.Transparent
+            };
+            pnlPassGroup.Controls.Add(lblPassIcon);
+
+            txtPassMontar = new TextBox
+            {
+                Location = new Point(40, 10),
+                Size = new Size(512, 24),
+                BorderStyle = BorderStyle.None,
                 BackColor = UITheme.cInputBackground,
                 ForeColor = UITheme.cTextPrimary,
-                Font = new Font("Segoe UI", 11, FontStyle.Bold),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                DrawMode = DrawMode.OwnerDrawFixed,
-                ItemHeight = 34
+                Font = new Font("Segoe UI", 10.5f),
+                UseSystemPasswordChar = true
             };
-            cmbLetraMontar.Items.AddRange(new[] { "M:\\", "Z:\\", "X:\\", "W:\\", "L:\\", "K:\\", "J:\\" });
-            cmbLetraMontar.DrawItem += (s, e) =>
+            txtPassMontar.GotFocus += (s, e) => { _passFocused = true; pnlPassGroup.Invalidate(); };
+            txtPassMontar.LostFocus += (s, e) => { _passFocused = false; pnlPassGroup.Invalidate(); };
+            pnlPassGroup.Controls.Add(txtPassMontar);
+
+            btnEye = new Button
             {
-                if (e.Index < 0 || s is not ComboBox cb) return;
-                bool sel = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
-                using (var b = new SolidBrush(sel ? UITheme.cAccentRed : UITheme.cInputBackground)) e.Graphics.FillRectangle(b, e.Bounds);
-                using (var tb = new SolidBrush(UITheme.cTextPrimary))
-                {
-                    string txt = cb.Items[e.Index]?.ToString() ?? "";
-                    SizeF sz = e.Graphics.MeasureString(txt, cb.Font);
-                    e.Graphics.DrawString(txt, cb.Font, tb, new PointF(e.Bounds.X + (e.Bounds.Width - sz.Width) / 2, e.Bounds.Y + (e.Bounds.Height - cb.Font.Height) / 2));
-                }
+                Text = "👁",
+                Location = new Point(558, 4),
+                Size = new Size(38, 34),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.Transparent,
+                ForeColor = Color.FromArgb(160, 150, 150),
+                Cursor = Cursors.Hand,
+                Font = new Font("Segoe UI", 11)
             };
-            string savedLetter = Properties.Settings.Default.LetraGuardada;
-            cmbLetraMontar.Text = string.IsNullOrEmpty(savedLetter) ? "M:\\" : savedLetter;
-            card.Controls.Add(cmbLetraMontar);
+            btnEye.FlatAppearance.BorderSize = 0;
+            btnEye.MouseDown += (s, e) => { txtPassMontar.UseSystemPasswordChar = false; btnEye.ForeColor = UITheme.cAccentRed; };
+            btnEye.MouseUp += (s, e) => { txtPassMontar.UseSystemPasswordChar = true; btnEye.ForeColor = Color.FromArgb(160, 150, 150); };
+            pnlPassGroup.Controls.Add(btnEye);
+            card.Controls.Add(pnlPassGroup);
 
-            lblPassMontar = UITheme.CrearEtiqueta(card, Localization.Get("lbl_mount_pass"), 160, 170);
-            txtPassMontar = UITheme.CrearInputPassword(card, 160, 195, 350);
-
+            // 4. Botones de Acción
             btnAccionMontar = new Button
             {
-                Text = Localization.Get("btn_mount"),
-                Size = new Size(470, 45),
-                Location = new Point(40, 260)
+                Text = "💾 " + (Localization.Get("btn_mount") ?? "MONTAR COMO DISCO VIRTUAL"),
+                Size = new Size(390, 48),
+                Location = new Point(40, 336),
+                BackColor = UITheme.cAccentRed,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
+                Cursor = Cursors.Hand
             };
-            UITheme.EstilarBotonAccion(btnAccionMontar);
+            btnAccionMontar.FlatAppearance.BorderSize = 0;
+            btnAccionMontar.FlatAppearance.MouseOverBackColor = UITheme.cAccentRedHover;
             btnAccionMontar.Click += (s, e) =>
             {
                 if (lstCarpetasParaMontar.SelectedItem == null)
@@ -105,18 +260,23 @@ namespace FolderLocker.UI.Views
                     DarkDialogs.ShowInfo(Localization.Get("msg_mount_select"));
                     return;
                 }
-                MontarRequested?.Invoke(lstCarpetasParaMontar.SelectedItem.ToString()!, cmbLetraMontar.Text, txtPassMontar.Text);
+                MontarRequested?.Invoke(lstCarpetasParaMontar.SelectedItem.ToString()!, _letraSeleccionada, txtPassMontar.Text);
             };
             card.Controls.Add(btnAccionMontar);
 
             btnAccionDesmontar = new Button
             {
-                Text = Localization.Get("btn_unmount"),
-                Size = new Size(470, 40),
-                Location = new Point(40, 315)
+                Text = "⏏️ " + (Localization.Get("btn_unmount") ?? "DESMONTAR"),
+                Size = new Size(200, 48),
+                Location = new Point(440, 336),
+                BackColor = Color.FromArgb(46, 36, 36),
+                ForeColor = Color.FromArgb(248, 113, 113),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                Cursor = Cursors.Hand
             };
-            UITheme.EstilarBotonSecundario(btnAccionDesmontar);
-            btnAccionDesmontar.ForeColor = Color.IndianRed;
+            btnAccionDesmontar.FlatAppearance.BorderSize = 0;
+            btnAccionDesmontar.FlatAppearance.MouseOverBackColor = Color.FromArgb(64, 46, 46);
             btnAccionDesmontar.Click += (s, e) =>
             {
                 if (lstCarpetasParaMontar.SelectedItem == null)
@@ -128,7 +288,46 @@ namespace FolderLocker.UI.Views
             };
             card.Controls.Add(btnAccionDesmontar);
 
+            // 5. Tip de ayuda al pie
+            lblTip = new Label
+            {
+                Text = Localization.CurrentLang == "EN"
+                    ? "💡 The virtual drive appears in Windows Explorer and encrypts seamlessly in real-time."
+                    : "💡 La unidad virtual aparecerá en Este Equipo y se cifra en tiempo real sin alterar el disco físico.",
+                Location = new Point(40, 396),
+                Size = new Size(600, 20),
+                ForeColor = Color.FromArgb(120, 110, 110),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI", 7.8f, FontStyle.Regular)
+            };
+            card.Controls.Add(lblTip);
+
             Recentrar();
+        }
+
+        private void ActualizarEstiloChips()
+        {
+            foreach (var btn in _chipButtons)
+            {
+                bool sel = string.Equals(btn.Tag?.ToString(), _letraSeleccionada, StringComparison.OrdinalIgnoreCase);
+                btn.BackColor = sel ? UITheme.cAccentRed : Color.FromArgb(42, 38, 38);
+                btn.ForeColor = sel ? Color.White : Color.FromArgb(200, 190, 190);
+                btn.Font = new Font("Segoe UI", 9.5f, sel ? FontStyle.Bold : FontStyle.Regular);
+            }
+        }
+
+        private static Label CrearBadge(string text, Color bg, Color fg, int x, int y)
+        {
+            return new Label
+            {
+                Text = text,
+                Location = new Point(x, y),
+                BackColor = bg,
+                ForeColor = fg,
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                Padding = new Padding(6, 3, 6, 3),
+                AutoSize = true
+            };
         }
 
         public void CargarCarpetas(IEnumerable<string> carpetas, string seleccionar = "")
@@ -157,11 +356,17 @@ namespace FolderLocker.UI.Views
         public void ActualizarIdioma()
         {
             lblTituloMontar.Text = Localization.Get("title_virtual");
+            lblSubtituloMontar.Text = Localization.CurrentLang == "EN"
+                ? "Mount your protected vaults as virtual hard drives on-the-fly without decrypting."
+                : "Monta tus bóvedas como discos duros virtuales en tiempo real sin necesidad de desencriptar.";
             lblListaMontar.Text = Localization.Get("lbl_vaults").ToUpper();
             lblLetraMontar.Text = Localization.Get("lbl_drive").ToUpper();
             lblPassMontar.Text = Localization.Get("lbl_mount_pass").ToUpper();
-            btnAccionMontar.Text = Localization.Get("btn_mount");
-            btnAccionDesmontar.Text = Localization.Get("btn_unmount");
+            btnAccionMontar.Text = "💾 " + (Localization.Get("btn_mount") ?? "MONTAR COMO DISCO VIRTUAL");
+            btnAccionDesmontar.Text = "⏏️ " + (Localization.Get("btn_unmount") ?? "DESMONTAR");
+            lblTip.Text = Localization.CurrentLang == "EN"
+                ? "💡 The virtual drive appears in Windows Explorer and encrypts seamlessly in real-time."
+                : "💡 La unidad virtual aparecerá en Este Equipo y se cifra en tiempo real sin alterar el disco físico.";
         }
 
         protected override void OnResize(EventArgs e)
@@ -173,14 +378,20 @@ namespace FolderLocker.UI.Views
         private void Recentrar()
         {
             if (card == null) return;
+            int totalH = 80 + card.Height;
+            int startY = Math.Max(25, (this.ClientSize.Height - totalH) / 2);
             int x = Math.Max(20, (this.ClientSize.Width - card.Width) / 2);
-            int y = Math.Max(50, (this.ClientSize.Height - card.Height) / 2);
-            card.Location = new Point(x, y);
 
             if (lblTituloMontar != null)
             {
-                lblTituloMontar.Location = new Point(x, Math.Max(10, y - 45));
+                lblTituloMontar.Location = new Point(x, startY);
             }
+            if (lblSubtituloMontar != null)
+            {
+                lblSubtituloMontar.Location = new Point(x, startY + 34);
+            }
+
+            card.Location = new Point(x, startY + 68);
         }
     }
 }

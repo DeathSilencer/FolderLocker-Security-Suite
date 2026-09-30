@@ -14,6 +14,7 @@ namespace FolderLocker.UI.Views
         private Button btnVolver = null!;
 
         public event Action? VolverRequested;
+        public Panel CardPanel => card;
 
         public CreditosView()
         {
@@ -24,51 +25,81 @@ namespace FolderLocker.UI.Views
 
         private void InicializarComponentes()
         {
-            card = UITheme.CrearTarjetaBase(550, 400);
+            // Tarjeta principal (680 x 400)
+            card = new Panel
+            {
+                Size = new Size(680, 400),
+                BackColor = UITheme.cSurface
+            };
+            card.Paint += (s, e) =>
+            {
+                ControlPaint.DrawBorder(e.Graphics, card.ClientRectangle, UITheme.cBorder, ButtonBorderStyle.Solid);
+                using var b = new SolidBrush(UITheme.cAccentRed);
+                e.Graphics.FillRectangle(b, 0, 0, card.Width, 3);
+            };
             this.Controls.Add(card);
+
+            // Badges superiores
+            int badgeY = 18;
+            var badge1 = CrearBadge("👨‍💻 DESARROLLADOR", Color.FromArgb(50, 22, 22), Color.FromArgb(252, 165, 165), 40, badgeY);
+            var badge2 = CrearBadge("🚀 FOLDERLOCKER SUITE", Color.FromArgb(36, 33, 33), Color.FromArgb(209, 213, 219), 180, badgeY);
+            card.Controls.AddRange(new Control[] { badge1, badge2 });
 
             lblTitulo = new Label
             {
                 Text = "CRÉDITOS Y DESARROLLADOR",
-                ForeColor = UITheme.cAccentRed,
-                Font = new Font("Segoe UI Black", 20, FontStyle.Bold),
-                AutoSize = true
+                ForeColor = UITheme.cTextPrimary,
+                Font = new Font("Segoe UI Semibold", 18, FontStyle.Bold),
+                AutoSize = true,
+                Location = new Point(40, 56)
             };
             card.Controls.Add(lblTitulo);
 
             pbFoto = new UITheme.CircularPictureBox
             {
-                Size = new Size(100, 100),
-                BackColor = Color.FromArgb(40, 40, 40),
+                Size = new Size(110, 110),
+                BackColor = Color.FromArgb(40, 36, 36),
                 SizeMode = PictureBoxSizeMode.Zoom,
-                Image = Properties.Resources.FotoPerfil2
+                Image = Properties.Resources.FotoPerfil2,
+                Location = new Point(50, 110)
             };
             card.Controls.Add(pbFoto);
 
             lblDevInfo = new Label
             {
-                Text = "Desarrollado por: David Platas\nContacto: davarman10@gmail.com",
-                Font = new Font("Segoe UI", 11),
+                Text = "David Armando Platas\nLead Software Engineer & Security Architect\n\nContacto: davarman10@gmail.com",
+                Font = new Font("Segoe UI", 10.5f),
                 ForeColor = UITheme.cTextPrimary,
-                AutoSize = true
+                Location = new Point(180, 120),
+                Size = new Size(450, 80),
+                BackColor = Color.Transparent
             };
             card.Controls.Add(lblDevInfo);
 
             lblVersion = new Label
             {
-                Text = "FolderLocker v5.0 (2025)",
+                Text = "FolderLocker Security Suite v2.0 • 2026\nDesarrollado con C#, .NET 8, Dokan Mirror Driver & AES-256 CTR Atómico.",
                 Font = new Font("Segoe UI", 9),
                 ForeColor = UITheme.cTextSecondary,
-                AutoSize = true
+                Location = new Point(50, 240),
+                Size = new Size(580, 40),
+                BackColor = Color.Transparent
             };
             card.Controls.Add(lblVersion);
 
             btnGitHub = new Button
             {
-                Text = "Ver en GitHub",
-                Size = new Size(150, 40)
+                Text = "🌐 Visitar GitHub",
+                Size = new Size(280, 48),
+                Location = new Point(50, 305),
+                BackColor = Color.FromArgb(46, 42, 42),
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
             };
-            UITheme.EstilarBotonSecundario(btnGitHub);
+            btnGitHub.FlatAppearance.BorderSize = 0;
+            btnGitHub.FlatAppearance.MouseOverBackColor = Color.FromArgb(64, 58, 58);
             btnGitHub.Click += (s, e) =>
             {
                 try
@@ -81,35 +112,40 @@ namespace FolderLocker.UI.Views
 
             btnVolver = new Button
             {
-                Text = "Volver",
-                Size = new Size(150, 40)
+                Text = "⬅ Volver a Configuración",
+                Size = new Size(280, 48),
+                Location = new Point(350, 305),
+                BackColor = UITheme.cAccentRed,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
             };
-            UITheme.EstilarBotonAccion(btnVolver);
+            btnVolver.FlatAppearance.BorderSize = 0;
+            btnVolver.FlatAppearance.MouseOverBackColor = UITheme.cAccentRedHover;
             btnVolver.Click += (s, e) => VolverRequested?.Invoke();
             card.Controls.Add(btnVolver);
 
-            LayoutInterno();
             Recentrar();
         }
 
-        private void LayoutInterno()
+        private static Label CrearBadge(string text, Color bg, Color fg, int x, int y)
         {
-            if (card == null) return;
-            lblTitulo.Location = new Point((card.Width - lblTitulo.Width) / 2, 30);
-            pbFoto.Location = new Point((card.Width - pbFoto.Width) / 2 - 160, 100);
-            lblDevInfo.Location = new Point(pbFoto.Right + 20, pbFoto.Top + 30);
-            lblVersion.Location = new Point((card.Width - lblVersion.Width) / 2, pbFoto.Bottom + 40);
-
-            int totalWidth = btnGitHub.Width + 20 + btnVolver.Width;
-            int startX = (card.Width - totalWidth) / 2;
-            btnGitHub.Location = new Point(startX, lblVersion.Bottom + 30);
-            btnVolver.Location = new Point(btnGitHub.Right + 20, lblVersion.Bottom + 30);
+            return new Label
+            {
+                Text = text,
+                Location = new Point(x, y),
+                BackColor = bg,
+                ForeColor = fg,
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                Padding = new Padding(6, 3, 6, 3),
+                AutoSize = true
+            };
         }
 
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
-            LayoutInterno();
             Recentrar();
         }
 
@@ -117,7 +153,7 @@ namespace FolderLocker.UI.Views
         {
             if (card == null) return;
             int x = Math.Max(20, (this.ClientSize.Width - card.Width) / 2);
-            int y = Math.Max(20, (this.ClientSize.Height - card.Height) / 2);
+            int y = Math.Max(25, (this.ClientSize.Height - card.Height) / 2);
             card.Location = new Point(x, y);
         }
     }

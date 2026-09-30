@@ -5,8 +5,11 @@ namespace FolderLocker.UI.Views
     public class ManualView : UserControl
     {
         private Label lblManualTitulo = null!;
+        private Label lblManualSubtitulo = null!;
         private Panel card = null!;
-        private Label lblManualTexto = null!;
+        private TextBox txtManualContenido = null!;
+
+        public Panel CardPanel => card;
 
         public ManualView()
         {
@@ -19,36 +22,83 @@ namespace FolderLocker.UI.Views
         {
             lblManualTitulo = new Label
             {
-                Text = Localization.Get("manual_title"),
-                ForeColor = UITheme.cAccentRed,
-                Font = new Font("Segoe UI Black", 20, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(50, 30)
+                Text = Localization.Get("manual_title") ?? "MANUAL DE USO",
+                ForeColor = UITheme.cTextPrimary,
+                Font = new Font("Segoe UI Semibold", 20, FontStyle.Bold),
+                AutoSize = true
             };
             this.Controls.Add(lblManualTitulo);
 
-            card = UITheme.CrearTarjetaBase(550, 600);
+            lblManualSubtitulo = new Label
+            {
+                Text = Localization.CurrentLang == "EN"
+                    ? "Learn how to encrypt, mount virtual drives, and protect your private data."
+                    : "Aprende a cifrar carpetas, montar discos virtuales y proteger tu privacidad.",
+                ForeColor = Color.FromArgb(160, 150, 150),
+                Font = new Font("Segoe UI", 9.5f),
+                AutoSize = true
+            };
+            this.Controls.Add(lblManualSubtitulo);
+
+            // Tarjeta principal (680 x 440)
+            card = new Panel
+            {
+                Size = new Size(680, 440),
+                BackColor = UITheme.cSurface
+            };
+            card.Paint += (s, e) =>
+            {
+                ControlPaint.DrawBorder(e.Graphics, card.ClientRectangle, UITheme.cBorder, ButtonBorderStyle.Solid);
+                using var b = new SolidBrush(UITheme.cAccentRed);
+                e.Graphics.FillRectangle(b, 0, 0, card.Width, 3);
+            };
             this.Controls.Add(card);
 
-            lblManualTexto = new Label
+            // Badges superiores
+            int badgeY = 18;
+            var badge1 = CrearBadge("📖 GUÍA DE USUARIO", Color.FromArgb(50, 22, 22), Color.FromArgb(252, 165, 165), 40, badgeY);
+            var badge2 = CrearBadge("🛡 MEJORES PRÁCTICAS", Color.FromArgb(36, 33, 33), Color.FromArgb(209, 213, 219), 180, badgeY);
+            card.Controls.AddRange(new Control[] { badge1, badge2 });
+
+            txtManualContenido = new TextBox
             {
-                Text = Localization.Get("manual_text"),
-                ForeColor = Color.WhiteSmoke,
-                Font = new Font("Segoe UI", 11),
-                AutoSize = false,
-                Size = new Size(510, 560),
-                Location = new Point(20, 20),
-                TextAlign = ContentAlignment.TopLeft
+                Multiline = true,
+                ReadOnly = true,
+                ScrollBars = ScrollBars.Vertical,
+                BackColor = UITheme.cInputBackground,
+                ForeColor = Color.FromArgb(230, 230, 230),
+                Font = new Font("Segoe UI", 10),
+                BorderStyle = BorderStyle.None,
+                Location = new Point(40, 56),
+                Size = new Size(600, 360),
+                Text = Localization.Get("manual_text")
             };
-            card.Controls.Add(lblManualTexto);
+            card.Controls.Add(txtManualContenido);
 
             Recentrar();
         }
 
+        private static Label CrearBadge(string text, Color bg, Color fg, int x, int y)
+        {
+            return new Label
+            {
+                Text = text,
+                Location = new Point(x, y),
+                BackColor = bg,
+                ForeColor = fg,
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                Padding = new Padding(6, 3, 6, 3),
+                AutoSize = true
+            };
+        }
+
         public void ActualizarIdioma()
         {
-            lblManualTitulo.Text = Localization.Get("manual_title");
-            lblManualTexto.Text = Localization.Get("manual_text");
+            lblManualTitulo.Text = Localization.Get("manual_title") ?? "MANUAL DE USO";
+            lblManualSubtitulo.Text = Localization.CurrentLang == "EN"
+                ? "Learn how to encrypt, mount virtual drives, and protect your private data."
+                : "Aprende a cifrar carpetas, montar discos virtuales y proteger tu privacidad.";
+            txtManualContenido.Text = Localization.Get("manual_text");
         }
 
         protected override void OnResize(EventArgs e)
@@ -60,14 +110,20 @@ namespace FolderLocker.UI.Views
         private void Recentrar()
         {
             if (card == null) return;
+            int totalH = 80 + card.Height;
+            int startY = Math.Max(25, (this.ClientSize.Height - totalH) / 2);
             int x = Math.Max(20, (this.ClientSize.Width - card.Width) / 2);
-            int y = Math.Max(50, (this.ClientSize.Height - card.Height) / 2);
-            card.Location = new Point(x, y);
 
             if (lblManualTitulo != null)
             {
-                lblManualTitulo.Location = new Point(x, Math.Max(10, y - 45));
+                lblManualTitulo.Location = new Point(x, startY);
             }
+            if (lblManualSubtitulo != null)
+            {
+                lblManualSubtitulo.Location = new Point(x, startY + 34);
+            }
+
+            card.Location = new Point(x, startY + 68);
         }
     }
 }
