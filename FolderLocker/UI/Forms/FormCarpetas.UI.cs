@@ -739,7 +739,7 @@ namespace FolderLocker
                         2000,
                         Localization.Get("tray_min_title") ?? "FolderLocker",
                         Localization.Get("tray_min_click") ?? "La aplicación sigue ejecutándose en segundo plano.",
-                        ToolTipIcon.Info
+                        ToolTipIcon.None
                     );
                     _yaSeNotificoTray = true;
                 }
@@ -758,7 +758,7 @@ namespace FolderLocker
             btnMin.Click += (s, e) =>
             {
                 this.WindowState = FormWindowState.Minimized;
-                trayIcon.ShowBalloonTip(2000, Localization.Get("tray_min_title"), Localization.Get("tray_min_click"), ToolTipIcon.Info);
+                trayIcon.ShowBalloonTip(2000, Localization.Get("tray_min_title"), Localization.Get("tray_min_click"), ToolTipIcon.None);
             };
             this.Controls.Add(btnMin);
         }

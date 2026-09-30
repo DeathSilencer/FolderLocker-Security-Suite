@@ -13,6 +13,10 @@ namespace FolderLocker
         // Bandera para distinguir entre minimizar al tray y cerrar la app real
         private bool cierreReal = false;
 
+        // Control de concurrencia y bloqueo de operaciones en curso
+        private bool _estaProcesando = false;
+        private string? _rutaEnProceso = null;
+
         // Referencia a la ventana de progreso actual
         private DarkProgress? progresoActivo = null;
 
@@ -36,13 +40,13 @@ namespace FolderLocker
         private void SuscribirEventos()
         {
             // Navegación Sidebar y Tabs
-            btnCarpetas.Click += (s, e) => MostrarPanelProteger();
-            btnMenuAbrir.Click += (s, e) => ActualizarYMostrarPanelMontar();
-            btnDejarDeProteger.Click += (s, e) => ActualizarYMostrarPanelRestaurar();
-            btnProteger.Click += (s, e) => MostrarPanelProteger();
-            btnManual.Click += (s, e) => MostrarPanelManual();
-            btnSetup.Click += (s, e) => MostrarPanelConfiguracion();
-            btnExplorador.Click += (s, e) => IntentarAbrirExplorador();
+            btnCarpetas.Click += (s, e) => { if (!_estaProcesando) MostrarPanelProteger(); };
+            btnMenuAbrir.Click += (s, e) => { if (!_estaProcesando) ActualizarYMostrarPanelMontar(); };
+            btnDejarDeProteger.Click += (s, e) => { if (!_estaProcesando) ActualizarYMostrarPanelRestaurar(); };
+            btnProteger.Click += (s, e) => { if (!_estaProcesando) MostrarPanelProteger(); };
+            btnManual.Click += (s, e) => { if (!_estaProcesando) MostrarPanelManual(); };
+            btnSetup.Click += (s, e) => { if (!_estaProcesando) MostrarPanelConfiguracion(); };
+            btnExplorador.Click += (s, e) => { if (!_estaProcesando) IntentarAbrirExplorador(); };
             btnSalir.Click += (s, e) => CerrarSesion();
 
             // Eventos de Vistas Modulares
@@ -75,7 +79,7 @@ namespace FolderLocker
             _setupView.SetupCompleted += (masterPass) =>
             {
                 UserManager.SetMasterPassword(masterPass);
-                DarkDialogs.ShowInfo(Localization.Get("cfg_done"), Localization.Get("title_success"));
+                DarkDialogs.ShowInfo(Localization.Get("cfg_done"), Localization.Get("title_success"), this);
                 ModoNormal();
             };
             _setupView.IdiomaChanged += () => ActualizarTextosIdioma();
@@ -117,38 +121,67 @@ namespace FolderLocker
 
             ActualizarTextosIdioma();
             ModoNormal();
-            DarkDialogs.ShowInfo(string.Format(Localization.Get("login_welcome"), user.Username));
+            DarkDialogs.ShowInfo(string.Format(Localization.Get("login_welcome"), user.Username), "Bienvenido", this);
         }
 
         #endregion
 
-        #region 3. LÓGICA DE BLOQUEO (ENCRIPTACIÓN TRANSACCIONAL)
+        #region 3. LÓGICA DE BLOQUEO (ENCRIPTACIÓN TRANSACCIONAL Y VALIDACIONES BLINDADAS)
 
         private async void EjecutarBloqueo(string ruta, string contrasena)
         {
-            if (string.IsNullOrEmpty(ruta)) { DarkDialogs.ShowInfo(Localization.Get("msg_select_dir")); return; }
-            if (EsRutaProhibida(ruta, out string errorSeguridad)) { DarkDialogs.ShowInfo(errorSeguridad, Localization.Get("err_security_title")); return; }
+            // 1. Validación de concurrencia: si ya se está procesando algo
+            if (_estaProcesando)
+            {
+                DarkDialogs.ShowInfo("Ya hay una operación de cifrado en curso. Por favor espera a que finalice.", "Operación en Curso", this);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(ruta)) { DarkDialogs.ShowInfo(Localization.Get("msg_select_dir"), "Info", this); return; }
+            if (EsRutaProhibida(ruta, out string errorSeguridad)) { DarkDialogs.ShowInfo(errorSeguridad, Localization.Get("err_security_title"), this); return; }
+
+            string rNorm = Path.GetFullPath(ruta).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            // 2. Validación de integridad: No encriptar una carpeta que esté montada como disco Dokan
+            if (montajesActivos.ContainsKey(rNorm) || montajesActivos.Keys.Any(k => string.Equals(Path.GetFullPath(k).TrimEnd('\\'), rNorm, StringComparison.OrdinalIgnoreCase)))
+            {
+                string letra = montajesActivos.FirstOrDefault(k => string.Equals(Path.GetFullPath(k.Key).TrimEnd('\\'), rNorm, StringComparison.OrdinalIgnoreCase)).Value ?? "activa";
+                DarkDialogs.ShowInfo($"La carpeta '{Path.GetFileName(ruta)}' está actualmente montada como unidad virtual ({letra}).\n\nDebes desmontar la unidad antes de poder encriptar la carpeta.", "Carpeta Montada en Uso", this);
+                return;
+            }
 
             if (!Directory.Exists(ruta))
             {
                 try { Directory.CreateDirectory(ruta); }
-                catch { DarkDialogs.ShowInfo("No se pudo encontrar ni crear la carpeta.", "Error"); return; }
+                catch { DarkDialogs.ShowInfo("No se pudo encontrar ni crear la carpeta.", "Error", this); return; }
             }
 
-            bool tieneArchivos = Directory.EnumerateFiles(ruta, "*.*", SearchOption.AllDirectories).Any();
-            if (!tieneArchivos)
-            {
-                DarkDialogs.ShowInfo("La carpeta está vacía. No se puede proteger.", "Carpeta vacía");
-                return;
-            }
-
+            // 3. Validación de contraseña
             if (!UserManager.Login(UserManager.CurrentUser.Username, contrasena))
             {
                 DarkDialogs.ShowInfo(Localization.Get("msg_pass_wrong"), Localization.Get("title_error"), this);
                 return;
             }
 
-            // --- ESCANEO RÁPIDO Y RESUMEN PREVIO DE LA CARPETA ---
+            // 4. Validación de permisos de escritura en la carpeta destino
+            try
+            {
+                string testPath = Path.Combine(ruta, ".folderlocker_perm_test.tmp");
+                File.WriteAllText(testPath, "test");
+                File.Delete(testPath);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                DarkDialogs.ShowInfo("No tienes permisos suficientes de escritura en esta carpeta.\n\nEjecuta FolderLocker como Administrador o cambia los permisos de la carpeta.", "Permiso Denegado", this);
+                return;
+            }
+            catch (Exception ex)
+            {
+                DarkDialogs.ShowInfo("No se pudo verificar el acceso a la carpeta: " + ex.Message, "Error de Acceso", this);
+                return;
+            }
+
+            // 5. Escaneo rápido y resumen previo de la carpeta
             int totalArchivos = 0;
             long totalBytes = 0;
 
@@ -180,7 +213,21 @@ namespace FolderLocker
                 return;
             }
 
-            // Estimación y formato
+            // 6. Validación de espacio en disco disponible
+            try
+            {
+                string driveRoot = Path.GetPathRoot(Path.GetFullPath(ruta))!;
+                var driveInfo = new DriveInfo(driveRoot);
+                long espacioRequerido = totalBytes + (50L * 1024 * 1024); // Margen de 50 MB
+                if (driveInfo.AvailableFreeSpace < espacioRequerido)
+                {
+                    DarkDialogs.ShowInfo($"Espacio insuficiente en disco ({driveRoot}).\n\nSe requieren al menos {FormatearTamano(espacioRequerido)} de espacio libre para completar el cifrado seguro, pero el disco solo tiene {FormatearTamano(driveInfo.AvailableFreeSpace)} disponibles.", "Espacio Insuficiente", this);
+                    return;
+                }
+            }
+            catch { }
+
+            // 7. Estimación de tiempo y formato de datos
             string tamanoTexto = FormatearTamano(totalBytes);
             string tiempoEstimado = EstimarTiempo(totalArchivos, totalBytes);
             bool esVolumenGrande = totalArchivos >= 500 || totalBytes >= 500L * 1024 * 1024; // >500 archivos o >500 MB
@@ -219,6 +266,7 @@ namespace FolderLocker
                                  "¿Deseas iniciar la encriptación ahora?";
             }
 
+            // 8. Confirmación con el usuario antes de proceder
             if (DarkDialogs.ShowConfirm(mensajeResumen, tituloConfirm, this, ancho: 480, alinearIzquierda: true) != DialogResult.Yes)
             {
                 return;
@@ -239,7 +287,8 @@ namespace FolderLocker
             }
             catch { }
 
-            _protegerView.ConfigurarProcesando(true);
+            // 🔒 BLOQUEO TOTAL DE LA UI TRASERA: Nadie puede hacer clic en botones, cambiar de pestaña o arrastrar
+            BloquearUIProcesando(true, ruta);
 
             try
             {
@@ -254,7 +303,7 @@ namespace FolderLocker
                 if (EsCarpetaYaProtegidaFisicamente(ruta) && !EsElPropietario(ruta))
                 {
                     CerrarBarraProgreso();
-                    DarkDialogs.ShowInfo(Localization.Get("err_not_owner"), Localization.Get("title_security"));
+                    DarkDialogs.ShowInfo(Localization.Get("err_not_owner"), Localization.Get("title_security"), this);
                     return;
                 }
 
@@ -262,7 +311,7 @@ namespace FolderLocker
 
                 CerrarBarraProgreso();
 
-                trayIcon.ShowBalloonTip(3000, "FolderLocker", Localization.Get("msg_lock_success"), ToolTipIcon.Info);
+                trayIcon.ShowBalloonTip(3000, "FolderLocker", Localization.Get("msg_lock_success"), ToolTipIcon.None);
 
                 if (!this.Visible)
                 {
@@ -282,40 +331,58 @@ namespace FolderLocker
             catch (Exception ex)
             {
                 CerrarBarraProgreso();
-                DarkDialogs.ShowInfo("Hubo una interrupción: " + ex.Message + "\n\nLa carpeta se ha guardado en tu lista para que puedas intentar Restaurarla o Protegerla nuevamente.");
+                DarkDialogs.ShowInfo("Hubo una interrupción: " + ex.Message + "\n\nLa carpeta se ha guardado en tu lista para que puedas intentar Restaurarla o Protegerla nuevamente.", "Aviso", this);
             }
             finally
             {
                 CerrarBarraProgreso();
-                _protegerView.ConfigurarProcesando(false);
+                BloquearUIProcesando(false);
             }
         }
 
         #endregion
 
-        #region 4. LÓGICA DE DESBLOQUEO (RESTAURACIÓN)
+        #region 4. LÓGICA DE DESBLOQUEO (RESTAURACIÓN Y VALIDACIONES)
 
         private async void EjecutarRestauracion(string rutaSeleccionada)
         {
-            if (string.IsNullOrEmpty(rutaSeleccionada)) { DarkDialogs.ShowInfo(Localization.Get("msg_select_restore")); return; }
+            if (_estaProcesando)
+            {
+                DarkDialogs.ShowInfo("Ya hay una operación en curso. Por favor espera a que finalice.", "Operación en Curso", this);
+                return;
+            }
 
-            if (DarkDialogs.ShowConfirm(string.Format(Localization.Get("msg_confirm_decrypt"), rutaSeleccionada), Localization.Get("title_confirm")) == DialogResult.Yes)
+            if (string.IsNullOrEmpty(rutaSeleccionada)) { DarkDialogs.ShowInfo(Localization.Get("msg_select_restore"), "Info", this); return; }
+
+            if (!Directory.Exists(rutaSeleccionada))
+            {
+                DarkDialogs.ShowInfo($"La carpeta '{rutaSeleccionada}' ya no existe físicamente en el disco.", "Carpeta no encontrada", this);
+                return;
+            }
+
+            if (DarkDialogs.ShowConfirm(string.Format(Localization.Get("msg_confirm_decrypt"), rutaSeleccionada), Localization.Get("title_confirm"), this) == DialogResult.Yes)
             {
                 string pass = DarkDialogs.ShowInput(Localization.Get("lbl_pass"), Localization.Get("title_security"), true);
 
                 if (!UserManager.Login(UserManager.CurrentUser.Username, pass))
                 {
-                    DarkDialogs.ShowInfo(Localization.Get("msg_pass_wrong"), Localization.Get("title_error"));
+                    DarkDialogs.ShowInfo(Localization.Get("msg_pass_wrong"), Localization.Get("title_error"), this);
                     return;
                 }
 
-                if (montajesActivos.ContainsKey(rutaSeleccionada))
+                string rNorm = Path.GetFullPath(rutaSeleccionada).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                if (montajesActivos.ContainsKey(rNorm) || montajesActivos.Keys.Any(k => string.Equals(Path.GetFullPath(k).TrimEnd('\\'), rNorm, StringComparison.OrdinalIgnoreCase)))
                 {
-                    DesmontarSilencioso(montajesActivos[rutaSeleccionada]);
-                    montajesActivos.Remove(rutaSeleccionada);
+                    string letraAsociada = montajesActivos.FirstOrDefault(k => string.Equals(Path.GetFullPath(k.Key).TrimEnd('\\'), rNorm, StringComparison.OrdinalIgnoreCase)).Value;
+                    if (!string.IsNullOrEmpty(letraAsociada))
+                    {
+                        DesmontarSilencioso(letraAsociada, rutaSeleccionada);
+                        montajesActivos.Remove(rutaSeleccionada);
+                    }
                 }
 
-                _restaurarView.ConfigurarProcesando(true);
+                // 🔒 BLOQUEO TOTAL DE LA UI TRASERA
+                BloquearUIProcesando(true, rutaSeleccionada);
 
                 try
                 {
@@ -349,7 +416,7 @@ namespace FolderLocker
 
                     CerrarBarraProgreso();
 
-                    trayIcon.ShowBalloonTip(5000, Localization.Get("tray_done"), Localization.Get("tray_done_decrypt"), ToolTipIcon.Info);
+                    trayIcon.ShowBalloonTip(5000, Localization.Get("tray_done"), Localization.Get("tray_done_decrypt"), ToolTipIcon.None);
                     RestaurarVentana();
                     Application.DoEvents();
 
@@ -359,19 +426,46 @@ namespace FolderLocker
                 catch (Exception ex)
                 {
                     CerrarBarraProgreso();
-                    DarkDialogs.ShowInfo("Error al restaurar: " + ex.Message);
+                    DarkDialogs.ShowInfo("Error al restaurar: " + ex.Message, "Error", this);
                 }
                 finally
                 {
                     CerrarBarraProgreso();
-                    _restaurarView.ConfigurarProcesando(false);
+                    BloquearUIProcesando(false);
                 }
             }
         }
 
         #endregion
 
-        #region 5. HELPERS DE PROGRESO
+        #region 5. HELPERS DE PROGRESO Y BLOQUEO DE UI
+
+        private void BloquearUIProcesando(bool bloqueado, string? ruta = null)
+        {
+            _estaProcesando = bloqueado;
+            _rutaEnProceso = bloqueado ? ruta : null;
+
+            // Bloquear o desbloquear navegación del sidebar
+            if (btnCarpetas != null) btnCarpetas.Enabled = !bloqueado;
+            if (btnMenuAbrir != null) btnMenuAbrir.Enabled = !bloqueado;
+            if (btnExplorador != null) btnExplorador.Enabled = !bloqueado;
+            if (btnManual != null) btnManual.Enabled = !bloqueado;
+            if (btnSetup != null) btnSetup.Enabled = !bloqueado;
+            if (btnSalir != null) btnSalir.Enabled = !bloqueado;
+
+            // Bloquear o desbloquear pestañas superiores
+            if (btnProteger != null) btnProteger.Enabled = !bloqueado;
+            if (btnDejarDeProteger != null) btnDejarDeProteger.Enabled = !bloqueado;
+
+            // Bloquear arrastrar y soltar
+            this.AllowDrop = !bloqueado;
+
+            // Notificar a las vistas activas
+            if (_protegerView != null) _protegerView.ConfigurarProcesando(bloqueado);
+            if (_restaurarView != null) _restaurarView.ConfigurarProcesando(bloqueado);
+
+            this.Cursor = bloqueado ? Cursors.WaitCursor : Cursors.Default;
+        }
 
         private void InicializarBarraProgreso()
         {
@@ -379,7 +473,7 @@ namespace FolderLocker
             progresoActivo.OnMinimizarAlTray += (s, args) =>
             {
                 this.Hide();
-                trayIcon.ShowBalloonTip(3000, Localization.Get("tray_working"), Localization.Get("tray_working_desc"), ToolTipIcon.Info);
+                trayIcon.ShowBalloonTip(3000, Localization.Get("tray_working"), Localization.Get("tray_working_desc"), ToolTipIcon.None);
             };
             progresoActivo.Show(this);
         }
@@ -395,33 +489,47 @@ namespace FolderLocker
 
         #endregion
 
-        #region 6. VIRTUALIZACIÓN (DOKAN)
+        #region 6. VIRTUALIZACIÓN (DOKAN Y VALIDACIONES)
 
         private void EjecutarMontaje(string rutaSeleccionada, string letraDeseada, string password)
         {
-            if (string.IsNullOrEmpty(rutaSeleccionada)) { DarkDialogs.ShowInfo(Localization.Get("msg_mount_select")); return; }
+            if (string.IsNullOrEmpty(rutaSeleccionada)) { DarkDialogs.ShowInfo(Localization.Get("msg_mount_select"), "Info", this); return; }
+
+            string rNorm = Path.GetFullPath(rutaSeleccionada).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            // Validación de concurrencia: si la carpeta está encriptándose o desencriptándose
+            if (_estaProcesando)
+            {
+                if (_rutaEnProceso != null && string.Equals(Path.GetFullPath(_rutaEnProceso).TrimEnd('\\'), rNorm, StringComparison.OrdinalIgnoreCase))
+                {
+                    DarkDialogs.ShowInfo("Esta carpeta se está cifrando o descifrando en este momento.\n\nNo se puede montar como disco virtual hasta que la operación termine por completo.", "Carpeta en Proceso", this);
+                    return;
+                }
+                DarkDialogs.ShowInfo("Hay una operación de cifrado en curso en el sistema. Por seguridad, espera a que termine antes de montar unidades virtuales.", "Sistema Ocupado", this);
+                return;
+            }
 
             if (string.IsNullOrEmpty(letraDeseada))
             {
-                DarkDialogs.ShowInfo(Localization.Get("msg_mount_select_drive") ?? "Selecciona una letra de unidad.", Localization.Get("title_warning"));
+                DarkDialogs.ShowInfo(Localization.Get("msg_mount_select_drive") ?? "Selecciona una letra de unidad.", Localization.Get("title_warning"), this);
                 return;
             }
 
             if (montajesActivos.ContainsKey(rutaSeleccionada))
             {
-                DarkDialogs.ShowInfo(string.Format(Localization.Get("msg_mount_active"), montajesActivos[rutaSeleccionada]), Localization.Get("title_warning"));
+                DarkDialogs.ShowInfo(string.Format(Localization.Get("msg_mount_active"), montajesActivos[rutaSeleccionada]), Localization.Get("title_warning"), this);
                 return;
             }
 
             if (montajesActivos.ContainsValue(letraDeseada) || Directory.Exists(letraDeseada))
             {
-                DarkDialogs.ShowInfo(string.Format(Localization.Get("msg_drive_busy"), letraDeseada), Localization.Get("title_warning"));
+                DarkDialogs.ShowInfo(string.Format(Localization.Get("msg_drive_busy"), letraDeseada), Localization.Get("title_warning"), this);
                 return;
             }
 
             if (!UserManager.Login(UserManager.CurrentUser.Username, password))
             {
-                DarkDialogs.ShowInfo(Localization.Get("msg_pass_wrong"), Localization.Get("title_error"));
+                DarkDialogs.ShowInfo(Localization.Get("msg_pass_wrong"), Localization.Get("title_error"), this);
                 return;
             }
 
@@ -533,6 +641,12 @@ namespace FolderLocker
 
         private void EjecutarDesmontaje(string rutaSeleccionada)
         {
+            if (_estaProcesando)
+            {
+                DarkDialogs.ShowInfo("No puedes desmontar unidades mientras hay una operación de cifrado en curso.", "Sistema Ocupado", this);
+                return;
+            }
+
             if (string.IsNullOrEmpty(rutaSeleccionada))
             {
                 DarkDialogs.ShowInfo(Localization.Get("msg_unmount_select"), Localization.Get("title_warning"), this);
@@ -795,7 +909,7 @@ namespace FolderLocker
             else
             {
                 ActualizarYMostrarPanelMontar();
-                DarkDialogs.ShowInfo(Localization.Get("msg_no_vault"));
+                DarkDialogs.ShowInfo(Localization.Get("msg_no_vault"), "Info", this);
             }
         }
 
@@ -813,13 +927,24 @@ namespace FolderLocker
 
         private void SalirAplicacion()
         {
+            if (_estaProcesando)
+            {
+                DarkDialogs.ShowInfo("Hay una operación de cifrado o descifrado en curso.\n\nPor seguridad para evitar la corrupción de archivos, espera a que finalice.", "Operación en Curso", this);
+                return;
+            }
             cierreReal = true;
             Application.Exit();
         }
 
         private void CerrarSesion()
         {
-            if (DarkDialogs.ShowConfirm(Localization.Get("msg_logout_confirm"), Localization.Get("title_confirm")) == DialogResult.Yes)
+            if (_estaProcesando)
+            {
+                DarkDialogs.ShowInfo("No puedes cerrar sesión mientras se estén procesando archivos.", "Operación en Curso", this);
+                return;
+            }
+
+            if (DarkDialogs.ShowConfirm(Localization.Get("msg_logout_confirm"), Localization.Get("title_confirm"), this) == DialogResult.Yes)
             {
                 foreach (var kvp in montajesActivos) { DesmontarSilencioso(kvp.Value); }
                 montajesActivos.Clear();
@@ -830,7 +955,13 @@ namespace FolderLocker
 
         private void BtnFactoryReset_Click()
         {
-            if (DarkDialogs.ShowConfirm(Localization.Get("cfg_msg_reset"), Localization.Get("title_warning")) == DialogResult.Yes)
+            if (_estaProcesando)
+            {
+                DarkDialogs.ShowInfo("No puedes restablecer datos mientras se estén procesando archivos.", "Operación en Curso", this);
+                return;
+            }
+
+            if (DarkDialogs.ShowConfirm(Localization.Get("cfg_msg_reset"), Localization.Get("title_warning"), this) == DialogResult.Yes)
             {
                 foreach (var kvp in montajesActivos) DesmontarSilencioso(kvp.Value);
                 UserManager.DeleteCurrentUser();
@@ -849,12 +980,12 @@ namespace FolderLocker
             string? rec = UserManager.RecoverLoginPassword(UserManager.CurrentUser.Username, codigo.Trim());
             if (rec != null)
             {
-                DarkDialogs.ShowResultWithCopy(Localization.Get("rec_success_msg"), rec);
+                DarkDialogs.ShowResultWithCopy(Localization.Get("rec_success_msg"), rec, this);
                 _protegerView.Contrasena = rec;
             }
             else
             {
-                DarkDialogs.ShowInfo(Localization.Get("rec_fail_msg"), Localization.Get("title_error"));
+                DarkDialogs.ShowInfo(Localization.Get("rec_fail_msg"), Localization.Get("title_error"), this);
             }
         }
 
@@ -878,12 +1009,20 @@ namespace FolderLocker
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            // Seguridad: Bloquear cierre si hay proceso activo
+            if (_estaProcesando)
+            {
+                DarkDialogs.ShowInfo("Hay una operación de cifrado o descifrado en curso.\n\nPor seguridad para evitar daños o pérdida de datos, no puedes cerrar la aplicación hasta que termine.", "Operación en Curso", this);
+                e.Cancel = true;
+                return;
+            }
+
             if (!cierreReal)
             {
                 e.Cancel = true;
                 this.WindowState = FormWindowState.Minimized;
                 this.Hide();
-                trayIcon.ShowBalloonTip(2000, Localization.Get("tray_minimized_title"), Localization.Get("tray_minimized_msg"), ToolTipIcon.Info);
+                trayIcon.ShowBalloonTip(2000, Localization.Get("tray_minimized_title"), Localization.Get("tray_minimized_msg"), ToolTipIcon.None);
             }
             else
             {
@@ -894,11 +1033,22 @@ namespace FolderLocker
 
         private void FormCarpetas_DragEnter(object? sender, DragEventArgs e)
         {
+            if (_estaProcesando)
+            {
+                e.Effect = DragDropEffects.None;
+                return;
+            }
             if (e.Data != null && e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy; else e.Effect = DragDropEffects.None;
         }
 
         private void FormCarpetas_DragDrop(object? sender, DragEventArgs e)
         {
+            if (_estaProcesando)
+            {
+                DarkDialogs.ShowInfo("No puedes agregar otra carpeta mientras hay una operación de cifrado en curso.", "Sistema Ocupado", this);
+                return;
+            }
+
             if (e.Data != null && e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 string[]? files = (string[])e.Data.GetData(DataFormats.FileDrop);
@@ -909,12 +1059,45 @@ namespace FolderLocker
                 }
                 else
                 {
-                    DarkDialogs.ShowInfo(Localization.Get("err_drag_folder"), Localization.Get("err_drag_folder_title"));
+                    DarkDialogs.ShowInfo(Localization.Get("err_drag_folder"), Localization.Get("err_drag_folder_title"), this);
                 }
             }
         }
 
-        // --- Helpers de Seguridad ---
+        // --- Helpers de Seguridad y Estimación ---
+
+        private string FormatearTamano(long bytes)
+        {
+            string[] sufijos = { "B", "KB", "MB", "GB", "TB" };
+            int i = 0;
+            double dBytes = bytes;
+            while (dBytes >= 1024 && i < sufijos.Length - 1)
+            {
+                dBytes /= 1024;
+                i++;
+            }
+            return $"{dBytes:0.##} {sufijos[i]}";
+        }
+
+        private string EstimarTiempo(int numArchivos, long bytes)
+        {
+            double segPorBytes = (double)bytes / (30.0 * 1024 * 1024);
+            double segPorArchivos = (double)numArchivos / 600.0;
+            double segundosTotales = Math.Max(segPorBytes, segPorArchivos);
+
+            if (segundosTotales < 5)
+                return Localization.CurrentLang == "EN" ? "Less than 5 seconds" : "Menos de 5 segundos";
+            if (segundosTotales < 60)
+                return Localization.CurrentLang == "EN" ? $"Approx. {(int)Math.Ceiling(segundosTotales)} seconds" : $"Aprox. {(int)Math.Ceiling(segundosTotales)} segundos";
+
+            int minutos = (int)Math.Ceiling(segundosTotales / 60.0);
+            if (minutos < 60)
+                return Localization.CurrentLang == "EN" ? $"Approx. {minutos} minute(s)" : $"Aprox. {minutos} {(minutos == 1 ? "minuto" : "minutos")}";
+
+            int horas = minutos / 60;
+            int minsRestantes = minutos % 60;
+            return Localization.CurrentLang == "EN" ? $"Approx. {horas}h {minsRestantes}m" : $"Aprox. {horas}h {minsRestantes}m";
+        }
 
         private bool EsElPropietario(string rutaCarpeta)
         {
@@ -959,39 +1142,6 @@ namespace FolderLocker
             if (ruta.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.Windows), StringComparison.OrdinalIgnoreCase)) { msg = Localization.Get("err_sys"); return true; }
 
             return false;
-        }
-
-        private string FormatearTamano(long bytes)
-        {
-            string[] sufijos = { "B", "KB", "MB", "GB", "TB" };
-            int i = 0;
-            double dBytes = bytes;
-            while (dBytes >= 1024 && i < sufijos.Length - 1)
-            {
-                dBytes /= 1024;
-                i++;
-            }
-            return $"{dBytes:0.##} {sufijos[i]}";
-        }
-
-        private string EstimarTiempo(int numArchivos, long bytes)
-        {
-            double segPorBytes = (double)bytes / (30.0 * 1024 * 1024);
-            double segPorArchivos = (double)numArchivos / 600.0;
-            double segundosTotales = Math.Max(segPorBytes, segPorArchivos);
-
-            if (segundosTotales < 5)
-                return Localization.CurrentLang == "EN" ? "Less than 5 seconds" : "Menos de 5 segundos";
-            if (segundosTotales < 60)
-                return Localization.CurrentLang == "EN" ? $"Approx. {(int)Math.Ceiling(segundosTotales)} seconds" : $"Aprox. {(int)Math.Ceiling(segundosTotales)} segundos";
-
-            int minutos = (int)Math.Ceiling(segundosTotales / 60.0);
-            if (minutos < 60)
-                return Localization.CurrentLang == "EN" ? $"Approx. {minutos} minute(s)" : $"Aprox. {minutos} {(minutos == 1 ? "minuto" : "minutos")}";
-
-            int horas = minutos / 60;
-            int minsRestantes = minutos % 60;
-            return Localization.CurrentLang == "EN" ? $"Approx. {horas}h {minsRestantes}m" : $"Aprox. {horas}h {minsRestantes}m";
         }
 
         private void ModoConfiguracionInicial()
