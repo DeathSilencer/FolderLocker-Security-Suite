@@ -85,5 +85,48 @@ namespace FolderLocker.Tests
             Assert.Null(map.GetByRelativePath("Carpeta X\\doc2.txt"));
             Assert.NotNull(map.GetByRelativePath("fuera.txt"));
         }
+
+        [Fact]
+        public void HighVolumeBatch_FastLookupAndAtomicPersistence()
+        {
+            var map = new DirectoryMap(_tempDir, _crypto, autoSave: false);
+            const int count = 2000;
+            var entries = new List<FileEntry>(count);
+
+            for (int i = 0; i < count; i++)
+            {
+                var entry = map.AddEntry($"file_{i}.dat", false, $"sub_{i % 10}\\file_{i}.dat");
+                entries.Add(entry);
+            }
+
+            // O(1) in-memory fast lookups
+            for (int i = 0; i < count; i += 100)
+            {
+                var entry = entries[i];
+                var foundByPhysical = map.GetByPhysicalName(entry.PhysicalName);
+                var foundByRelative = map.GetByRelativePath(entry.RelativePath);
+                Assert.NotNull(foundByPhysical);
+                Assert.NotNull(foundByRelative);
+                Assert.Equal(entry.RealName, foundByPhysical.RealName);
+            }
+
+            // Guardado atómico
+            map.GuardarIndice();
+
+            // Recargar en una nueva instancia
+            var reloadedMap = new DirectoryMap(_tempDir, _crypto, autoSave: false);
+            Assert.Equal(count, reloadedMap.GetAll().Count);
+
+            var first = entries[0];
+            var last = entries[count - 1];
+
+            var reloadedFirst = reloadedMap.GetByPhysicalName(first.PhysicalName);
+            var reloadedLast = reloadedMap.GetByRelativePath(last.RelativePath);
+
+            Assert.NotNull(reloadedFirst);
+            Assert.Equal(first.RealName, reloadedFirst.RealName);
+            Assert.NotNull(reloadedLast);
+            Assert.Equal(last.RealName, reloadedLast.RealName);
+        }
     }
 }

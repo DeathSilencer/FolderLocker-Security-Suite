@@ -15,7 +15,12 @@ namespace FolderLocker
     {
         #region CAMPOS PRIVADOS
 
-        private List<FileEntry> _entries;
+        private List<FileEntry> _entries = new();
+        private readonly Dictionary<string, FileEntry> _byPhysical = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, FileEntry> _byRelative = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, FileEntry> _byRealName = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _physicalSet = new(StringComparer.OrdinalIgnoreCase);
+
         private readonly string _indexPath;
         private readonly CryptoService _crypto;
         private readonly bool _autoSave;
@@ -35,6 +40,34 @@ namespace FolderLocker
             CargarIndice();
         }
 
+        private void RebuildLookupTables()
+        {
+            _byPhysical.Clear();
+            _byRelative.Clear();
+            _byRealName.Clear();
+            _physicalSet.Clear();
+
+            if (_entries == null) return;
+
+            foreach (var e in _entries)
+            {
+                if (!string.IsNullOrEmpty(e.PhysicalName))
+                {
+                    _byPhysical[e.PhysicalName] = e;
+                    _physicalSet.Add(e.PhysicalName);
+                }
+                if (!string.IsNullOrEmpty(e.RelativePath))
+                {
+                    string normRel = e.RelativePath.Replace('/', '\\').TrimStart('\\');
+                    _byRelative[normRel] = e;
+                }
+                if (!string.IsNullOrEmpty(e.RealName) && !_byRealName.ContainsKey(e.RealName))
+                {
+                    _byRealName[e.RealName] = e;
+                }
+            }
+        }
+
         private void CargarIndice()
         {
             lock (_syncLock)
@@ -51,9 +84,10 @@ namespace FolderLocker
                         _crypto.TransformarDatos(encryptedBytes, 0, encryptedBytes.Length);
 
                         string json = System.Text.Encoding.UTF8.GetString(encryptedBytes);
-                        _entries = JsonSerializer.Deserialize<List<FileEntry>>(json);
+                        _entries = JsonSerializer.Deserialize<List<FileEntry>>(json) ?? new List<FileEntry>();
 
-                        if (_entries != null) return;
+                        RebuildLookupTables();
+                        return;
                     }
                     catch
                     {
@@ -67,12 +101,10 @@ namespace FolderLocker
                         _crypto.TransformarDatos(copyBytes, 0, copyBytes.Length);
 
                         string legacyJson = System.Text.Encoding.UTF8.GetString(copyBytes);
-                        _entries = JsonSerializer.Deserialize<List<FileEntry>>(legacyJson);
+                        _entries = JsonSerializer.Deserialize<List<FileEntry>>(legacyJson) ?? new List<FileEntry>();
 
-                        if (_entries != null)
-                        {
-                            return; // Bóveda legacy detectada y cargada exitosamente
-                        }
+                        RebuildLookupTables();
+                        return; // Bóveda legacy detectada y cargada exitosamente
                     }
                     catch
                     {
@@ -86,13 +118,14 @@ namespace FolderLocker
                 {
                     // Solo si el archivo NO existe iniciamos una lista nueva (Primera vez)
                     _entries = new List<FileEntry>();
+                    RebuildLookupTables();
                 }
             }
         }
 
         #endregion
 
-        #region PERSISTENCIA (GUARDADO)
+        #region PERSISTENCIA (GUARDADO ATÓMICO)
 
         public void GuardarIndice()
         {
@@ -103,18 +136,28 @@ namespace FolderLocker
                 {
                     try
                     {
-                        // Quitar atributos para poder escribir
-                        if (File.Exists(_indexPath)) File.SetAttributes(_indexPath, FileAttributes.Normal);
-
                         string json = JsonSerializer.Serialize(_entries);
                         byte[] plainBytes = System.Text.Encoding.UTF8.GetBytes(json);
 
                         // Cifrar antes de escribir
                         _crypto.TransformarDatos(plainBytes, 0, plainBytes.Length);
 
-                        File.WriteAllBytes(_indexPath, plainBytes);
+                        string tempPath = _indexPath + ".tmp";
+                        if (File.Exists(tempPath))
+                        {
+                            try { File.Delete(tempPath); } catch { }
+                        }
 
-                        // Restaurar atributos ocultos
+                        File.WriteAllBytes(tempPath, plainBytes);
+
+                        // Reemplazo atómico: si el archivo original existe, se remueven atributos y se sobreescribe atómicamente
+                        if (File.Exists(_indexPath))
+                        {
+                            File.SetAttributes(_indexPath, FileAttributes.Normal);
+                        }
+                        File.Move(tempPath, _indexPath, overwrite: true);
+
+                        // Restaurar atributos ocultos y de sistema
                         File.SetAttributes(_indexPath, FileAttributes.Hidden | FileAttributes.System);
 
                         break;
@@ -134,33 +177,36 @@ namespace FolderLocker
 
         #endregion
 
-        #region MÉTODOS DE ACCESO (CRUD)
+        #region MÉTODOS DE ACCESO (CRUD O(1))
 
-        public FileEntry GetByRealName(string name)
+        public FileEntry? GetByRealName(string name)
         {
+            if (string.IsNullOrEmpty(name)) return null;
             lock (_syncLock)
             {
+                if (_byRealName.TryGetValue(name, out var entry)) return entry;
                 return _entries.FirstOrDefault(e => e.RealName.Equals(name, StringComparison.OrdinalIgnoreCase));
             }
         }
 
-        public FileEntry GetByRelativePath(string relativePath)
+        public FileEntry? GetByRelativePath(string relativePath)
         {
             if (string.IsNullOrEmpty(relativePath)) return null;
             string normalized = relativePath.Replace('/', '\\').TrimStart('\\');
             lock (_syncLock)
             {
-                return _entries.FirstOrDefault(e =>
-                    !string.IsNullOrEmpty(e.RelativePath) &&
-                    e.RelativePath.Replace('/', '\\').TrimStart('\\').Equals(normalized, StringComparison.OrdinalIgnoreCase));
+                if (_byRelative.TryGetValue(normalized, out var entry)) return entry;
+                return null;
             }
         }
 
-        public FileEntry GetByPhysicalName(string name)
+        public FileEntry? GetByPhysicalName(string name)
         {
+            if (string.IsNullOrEmpty(name)) return null;
             lock (_syncLock)
             {
-                return _entries.FirstOrDefault(e => e.PhysicalName.Equals(name, StringComparison.OrdinalIgnoreCase));
+                if (_byPhysical.TryGetValue(name, out var entry)) return entry;
+                return null;
             }
         }
 
@@ -173,7 +219,7 @@ namespace FolderLocker
                 {
                     newPhysical = Guid.NewGuid().ToString("N").Substring(0, 12) + ".lock";
                 }
-                while (_entries.Any(e => e.PhysicalName.Equals(newPhysical, StringComparison.OrdinalIgnoreCase)));
+                while (_physicalSet.Contains(newPhysical)); // O(1) hash check
 
                 string normalizedRelPath = string.IsNullOrEmpty(relativePath)
                     ? realName
@@ -189,6 +235,13 @@ namespace FolderLocker
                 };
 
                 _entries.Add(newEntry);
+                _byPhysical[newPhysical] = newEntry;
+                _physicalSet.Add(newPhysical);
+                _byRelative[normalizedRelPath] = newEntry;
+                if (!_byRealName.ContainsKey(realName))
+                {
+                    _byRealName[realName] = newEntry;
+                }
 
                 if (_autoSave) GuardarIndice();
 
@@ -201,10 +254,25 @@ namespace FolderLocker
             if (string.IsNullOrEmpty(physicalName)) return;
             lock (_syncLock)
             {
-                var entry = _entries.FirstOrDefault(e => e.PhysicalName.Equals(physicalName, StringComparison.OrdinalIgnoreCase));
-                if (entry != null)
+                if (_byPhysical.TryGetValue(physicalName, out var entry))
                 {
                     _entries.Remove(entry);
+                    _byPhysical.Remove(physicalName);
+                    _physicalSet.Remove(physicalName);
+
+                    if (!string.IsNullOrEmpty(entry.RelativePath))
+                    {
+                        string normRel = entry.RelativePath.Replace('/', '\\').TrimStart('\\');
+                        _byRelative.Remove(normRel);
+                    }
+
+                    if (!string.IsNullOrEmpty(entry.RealName))
+                    {
+                        _byRealName.Remove(entry.RealName);
+                        var another = _entries.FirstOrDefault(e => e.RealName.Equals(entry.RealName, StringComparison.OrdinalIgnoreCase));
+                        if (another != null) _byRealName[another.RealName] = another;
+                    }
+
                     if (_autoSave) GuardarIndice();
                 }
             }
@@ -217,14 +285,19 @@ namespace FolderLocker
             string dirExact = relativeDirPath.Replace('/', '\\').TrimEnd('\\');
             lock (_syncLock)
             {
-                _entries.RemoveAll(e =>
+                int removed = _entries.RemoveAll(e =>
                 {
                     if (string.IsNullOrEmpty(e.RelativePath)) return false;
                     string norm = e.RelativePath.Replace('/', '\\');
                     return norm.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ||
                            norm.Equals(dirExact, StringComparison.OrdinalIgnoreCase);
                 });
-                if (_autoSave) GuardarIndice();
+
+                if (removed > 0)
+                {
+                    RebuildLookupTables();
+                    if (_autoSave) GuardarIndice();
+                }
             }
         }
 
@@ -238,6 +311,7 @@ namespace FolderLocker
 
             lock (_syncLock)
             {
+                bool changed = false;
                 foreach (var e in _entries)
                 {
                     if (string.IsNullOrEmpty(e.RelativePath)) continue;
@@ -245,13 +319,20 @@ namespace FolderLocker
                     if (norm.Equals(oldExact, StringComparison.OrdinalIgnoreCase))
                     {
                         e.RelativePath = newExact;
+                        changed = true;
                     }
                     else if (norm.StartsWith(oldPrefix, StringComparison.OrdinalIgnoreCase))
                     {
                         e.RelativePath = newPrefix + norm.Substring(oldPrefix.Length);
+                        changed = true;
                     }
                 }
-                if (_autoSave) GuardarIndice();
+
+                if (changed)
+                {
+                    RebuildLookupTables();
+                    if (_autoSave) GuardarIndice();
+                }
             }
         }
 
@@ -262,8 +343,7 @@ namespace FolderLocker
                 var entry = _entries.FirstOrDefault(e => e.RealName.Equals(realName, StringComparison.OrdinalIgnoreCase));
                 if (entry != null)
                 {
-                    _entries.Remove(entry);
-                    if (_autoSave) GuardarIndice();
+                    RemoveEntryByPhysical(entry.PhysicalName);
                 }
             }
         }

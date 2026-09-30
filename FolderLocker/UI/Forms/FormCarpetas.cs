@@ -518,7 +518,8 @@ namespace FolderLocker
             await System.Threading.Tasks.Task.Run(() =>
             {
                 var motorCifrado = new CryptoService(password);
-                var mapa = new DirectoryMap(rutaBase, motorCifrado, true);
+                // autoSave: false para permitir procesamiento ultrarrápido en lote
+                var mapa = new DirectoryMap(rutaBase, motorCifrado, autoSave: false);
 
                 if (!esEncriptar && File.Exists(Path.Combine(rutaBase, "dir.idx")) && mapa.GetAll().Count == 0)
                 {
@@ -526,148 +527,191 @@ namespace FolderLocker
                 }
 
                 var archivos = Directory.GetFiles(rutaBase, "*.*", SearchOption.AllDirectories);
-                long totalBytes = ObtenerTamanoDirectorio(rutaBase);
-                long bytesProcesadosTotal = 0;
+
+                // Cálculo eficiente de bytes totales en una sola pasada
+                long totalBytes = 0;
+                foreach (var f in archivos)
+                {
+                    string n = Path.GetFileName(f).ToLowerInvariant();
+                    if (n != "locker.id" && n != "dir.idx" && !n.EndsWith(".tmp"))
+                    {
+                        try { totalBytes += new FileInfo(f).Length; } catch { }
+                    }
+                }
                 if (totalBytes == 0) totalBytes = 1;
 
-                foreach (var archivoPath in archivos)
+                long bytesProcesadosTotal = 0;
+
+                // Two-Phase Commit: Lista de archivos originales pendientes de eliminar tras confirmar el índice
+                var archivosOriginalesABorrar = new List<string>();
+                int archivosEnLote = 0;
+                const int LotePuntoDeControl = 500; // Guarda el índice cada 500 archivos para blindaje ante apagones
+
+                // Buffer reutilizable de 128 KB (óptimo para SSD y previene saturación de memoria/GC)
+                const int BufferSize = 128 * 1024;
+                byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(BufferSize);
+
+                var cronometroUI = System.Diagnostics.Stopwatch.StartNew();
+                long ultimoReporteMs = 0;
+
+                try
                 {
-                    string nombreArchivoFisico = Path.GetFileName(archivoPath);
-                    string nombreLow = nombreArchivoFisico.ToLower();
-
-                    // Limpieza: Si encontramos un .tmp viejo de un apagón anterior, lo ignoramos o borramos
-                    if (nombreLow.EndsWith(".tmp"))
+                    foreach (var archivoPath in archivos)
                     {
-                        try { File.Delete(archivoPath); } catch { }
-                        continue;
-                    }
-                    if (nombreLow == "locker.id" || nombreLow == "dir.idx") continue;
+                        string nombreArchivoFisico = Path.GetFileName(archivoPath);
+                        string nombreLow = nombreArchivoFisico.ToLowerInvariant();
 
-                    string rutaRelativa = Path.GetRelativePath(rutaBase, archivoPath);
-
-                    try
-                    {
-                        FileEntry entry = null;
-
-                        // --- FASE 1: IDENTIFICACIÓN ---
-                        if (esEncriptar)
+                        // Limpieza: Si encontramos un .tmp de un apagón anterior, se elimina
+                        if (nombreLow.EndsWith(".tmp"))
                         {
-                            entry = mapa.GetByPhysicalName(nombreArchivoFisico);
-                            if (entry != null) { bytesProcesadosTotal += new FileInfo(archivoPath).Length; continue; }
-
-                            // Búsqueda por ruta relativa única para evitar colisiones con archivos del mismo nombre en otras subcarpetas
-                            entry = mapa.GetByRelativePath(rutaRelativa);
-                            if (entry == null) entry = mapa.AddEntry(nombreArchivoFisico, false, rutaRelativa);
+                            try { File.Delete(archivoPath); } catch { }
+                            continue;
                         }
-                        else
-                        {
-                            entry = mapa.GetByPhysicalName(nombreArchivoFisico);
-                            if (entry == null && nombreArchivoFisico.EndsWith(".restored"))
-                                entry = mapa.GetByPhysicalName(nombreArchivoFisico.Replace(".restored", ""));
+                        if (nombreLow == "locker.id" || nombreLow == "dir.idx") continue;
 
-                            // FILTRO DE INOCENCIA (Lo que agregamos antes)
-                            bool pareceEncriptado = nombreArchivoFisico.EndsWith(".lock");
-                            if (entry == null && !pareceEncriptado)
+                        string rutaRelativa = Path.GetRelativePath(rutaBase, archivoPath);
+
+                        try
+                        {
+                            FileEntry? entry = null;
+
+                            // --- FASE 1: IDENTIFICACIÓN O(1) ---
+                            if (esEncriptar)
                             {
-                                bytesProcesadosTotal += new FileInfo(archivoPath).Length;
-                                continue;
+                                entry = mapa.GetByPhysicalName(nombreArchivoFisico);
+                                if (entry != null) { bytesProcesadosTotal += new FileInfo(archivoPath).Length; continue; }
+
+                                entry = mapa.GetByRelativePath(rutaRelativa);
+                                if (entry == null) entry = mapa.AddEntry(nombreArchivoFisico, false, rutaRelativa);
                             }
-                        }
-
-                        // --- FASE 2: CRIPTOGRAFÍA SEGURA (ATOMIC SWAP) ---
-
-                        string rutaTemp = archivoPath + ".tmp"; // Archivo de trabajo seguro
-
-                        using (var fsOrigen = new FileStream(archivoPath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read))
-                        {
-                            using (var fsDestino = new FileStream(rutaTemp, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None))
+                            else
                             {
-                                int bufferSize = 1024 * 1024;
-                                byte[] buffer = new byte[bufferSize];
-                                int bytesLeidos;
-                                long offsetGlobal = 0;
+                                entry = mapa.GetByPhysicalName(nombreArchivoFisico);
+                                if (entry == null && nombreArchivoFisico.EndsWith(".restored"))
+                                    entry = mapa.GetByPhysicalName(nombreArchivoFisico.Replace(".restored", ""));
 
-                                while ((bytesLeidos = fsOrigen.Read(buffer, 0, bufferSize)) > 0)
+                                // Filtro de Inocencia
+                                bool pareceEncriptado = nombreArchivoFisico.EndsWith(".lock");
+                                if (entry == null && !pareceEncriptado)
                                 {
-                                    motorCifrado.TransformarDatos(buffer, offsetGlobal, bytesLeidos);
-
-                                    // Escribimos en el archivo TEMPORAL, no en el original
-                                    fsDestino.Write(buffer, 0, bytesLeidos);
-
-                                    offsetGlobal += bytesLeidos;
-                                    bytesProcesadosTotal += bytesLeidos;
-
-                                    int p = (int)((bytesProcesadosTotal * 100) / totalBytes);
-                                    string estado = esEncriptar ? $"Protegiendo: {nombreArchivoFisico}" : $"Restaurando: {nombreArchivoFisico}";
-                                    progreso.Report(Tuple.Create(Math.Min(p, 100), estado));
+                                    bytesProcesadosTotal += new FileInfo(archivoPath).Length;
+                                    continue;
                                 }
                             }
-                        }
 
-                        // --- FASE CRÍTICA: EL CAMBIAZO (SWAP BLINDADO) ---
-                        // Lógica: "Crear Destino -> Borrar Origen"
-                        // Así nunca hay un momento en que el archivo deje de existir.
+                            // --- FASE 2: CRIPTOGRAFÍA SEGURA (ATOMIC SWAP) ---
+                            string rutaTemp = archivoPath + ".tmp"; // Archivo de trabajo seguro
 
-                        string rutaFinal = archivoPath;
-
-                        // 1. Calcular nombre final
-                        if (esEncriptar && entry != null)
-                        {
-                            rutaFinal = Path.Combine(Path.GetDirectoryName(archivoPath), entry.PhysicalName);
-                        }
-                        else if (!esEncriptar && entry != null)
-                        {
-                            rutaFinal = Path.Combine(Path.GetDirectoryName(archivoPath), entry.RealName);
-                        }
-
-                        // 2. Limpieza preventiva del destino
-                        // Si por un apagón anterior quedó un archivo a medias en el destino, lo quitamos para poder escribir el bueno.
-                        if (rutaFinal != archivoPath && File.Exists(rutaFinal))
-                        {
-                            // Caso especial: Si estamos restaurando y el destino ya existe, usamos "Restored_" para no sobrescribir algo importante
-                            if (!esEncriptar)
+                            using (var fsOrigen = new FileStream(archivoPath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read))
                             {
-                                rutaFinal = Path.Combine(Path.GetDirectoryName(archivoPath), "Restored_" + entry.RealName);
+                                using (var fsDestino = new FileStream(rutaTemp, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None))
+                                {
+                                    int bytesLeidos;
+                                    long offsetGlobal = 0;
+
+                                    while ((bytesLeidos = fsOrigen.Read(buffer, 0, BufferSize)) > 0)
+                                    {
+                                        motorCifrado.TransformarDatos(buffer, offsetGlobal, bytesLeidos);
+
+                                        // Escribimos en el archivo TEMPORAL
+                                        fsDestino.Write(buffer, 0, bytesLeidos);
+
+                                        offsetGlobal += bytesLeidos;
+                                        bytesProcesadosTotal += bytesLeidos;
+
+                                        // Regulación de UI: Actualizar máximo cada 100 ms para no saturar Windows Forms
+                                        long actualMs = cronometroUI.ElapsedMilliseconds;
+                                        if (actualMs - ultimoReporteMs >= 100)
+                                        {
+                                            ultimoReporteMs = actualMs;
+                                            int p = (int)((bytesProcesadosTotal * 100) / totalBytes);
+                                            string estado = esEncriptar ? $"Protegiendo: {nombreArchivoFisico}" : $"Restaurando: {nombreArchivoFisico}";
+                                            progreso.Report(Tuple.Create(Math.Min(p, 100), estado));
+                                        }
+                                    }
+                                }
                             }
 
-                            // Si aún así existe (ej: Restored_Video.mp4 ya existe), borramos ese para poner el nuevo recién procesado
-                            if (File.Exists(rutaFinal)) File.Delete(rutaFinal);
+                            // --- FASE 3: EL CAMBIAZO (SWAP BLINDADO) ---
+                            string rutaFinal = archivoPath;
+
+                            if (esEncriptar && entry != null)
+                            {
+                                rutaFinal = Path.Combine(Path.GetDirectoryName(archivoPath)!, entry.PhysicalName);
+                            }
+                            else if (!esEncriptar && entry != null)
+                            {
+                                rutaFinal = Path.Combine(Path.GetDirectoryName(archivoPath)!, entry.RealName);
+                            }
+
+                            if (rutaFinal != archivoPath && File.Exists(rutaFinal))
+                            {
+                                if (!esEncriptar && entry != null)
+                                {
+                                    rutaFinal = Path.Combine(Path.GetDirectoryName(archivoPath)!, "Restored_" + entry.RealName);
+                                }
+                                if (File.Exists(rutaFinal)) File.Delete(rutaFinal);
+                            }
+
+                            // Mover temporal al destino final
+                            File.Move(rutaTemp, rutaFinal);
+
+                            // El original NO se borra aún: se añade a la lista de confirmación
+                            if (rutaFinal != archivoPath)
+                            {
+                                archivosOriginalesABorrar.Add(archivoPath);
+                            }
+
+                            if (!esEncriptar && entry != null)
+                            {
+                                mapa.RemoveEntryByPhysical(entry.PhysicalName);
+                            }
+
+                            archivosEnLote++;
+
+                            // --- PUNTO DE CONTROL (CHECKPOINT) CADA 500 ARCHIVOS ---
+                            if (archivosEnLote >= LotePuntoDeControl)
+                            {
+                                // 1. Confirmar y grabar índice en disco de forma atómica
+                                mapa.GuardarIndice();
+
+                                // 2. Ahora que el índice está 100% grabado, borramos los archivos originales de este lote
+                                foreach (var f in archivosOriginalesABorrar)
+                                {
+                                    try { if (File.Exists(f)) File.Delete(f); } catch { }
+                                }
+                                archivosOriginalesABorrar.Clear();
+                                archivosEnLote = 0;
+                            }
                         }
-
-                        // 3. MOVEMOS EL TEMPORAL AL FINAL (Aquí nace el archivo seguro)
-                        // En este momento exacto, existen TANTO el original (archivoPath) COMO el nuevo (rutaFinal).
-                        File.Move(rutaTemp, rutaFinal);
-
-                        // 4. BORRAMOS EL ORIGINAL (Solo si el paso 3 tuvo éxito)
-                        // Si se va la luz aquí, tendrás el archivo duplicado (encriptado y desencriptado), pero no perdiste nada.
-                        if (rutaFinal != archivoPath)
+                        catch (Exception ex)
                         {
-                            File.Delete(archivoPath);
+                            System.Diagnostics.Debug.WriteLine("Error crítico archivo: " + ex.Message);
+                            try { if (File.Exists(archivoPath + ".tmp")) File.Delete(archivoPath + ".tmp"); } catch { }
                         }
-
-                        // 5. Actualizamos Mapa
-                        if (esEncriptar) mapa.GuardarIndice();
-                        else if (!esEncriptar && entry != null) mapa.RemoveEntryByPhysical(entry.PhysicalName);
-
                     }
-                    catch (Exception ex)
+
+                    // --- FASE 4: FINALIZACIÓN Y CONFIRMACIÓN DEL ÚLTIMO LOTE ---
+                    mapa.GuardarIndice();
+
+                    foreach (var f in archivosOriginalesABorrar)
                     {
-                        System.Diagnostics.Debug.WriteLine("Error crítico archivo: " + ex.Message);
-                        // Si falló, intentamos borrar el .tmp para no dejar basura
-                        try { if (File.Exists(archivoPath + ".tmp")) File.Delete(archivoPath + ".tmp"); } catch { }
+                        try { if (File.Exists(f)) File.Delete(f); } catch { }
                     }
+                    archivosOriginalesABorrar.Clear();
+
+                    if (!esEncriptar && mapa.GetAll().Count == 0)
+                    {
+                        EliminarArchivoSeguro(Path.Combine(rutaBase, "dir.idx"));
+                        EliminarArchivoSeguro(Path.Combine(rutaBase, "locker.id"));
+                    }
+
+                    progreso.Report(Tuple.Create(100, Localization.Get("status_done")));
                 }
-
-                // --- FASE 4: FINALIZACIÓN ---
-                mapa.GuardarIndice();
-
-                if (!esEncriptar && mapa.GetAll().Count == 0)
+                finally
                 {
-                    EliminarArchivoSeguro(Path.Combine(rutaBase, "dir.idx"));
-                    EliminarArchivoSeguro(Path.Combine(rutaBase, "locker.id"));
+                    System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
                 }
-
-                progreso.Report(Tuple.Create(100, Localization.Get("status_done")));
             });
         }
 
