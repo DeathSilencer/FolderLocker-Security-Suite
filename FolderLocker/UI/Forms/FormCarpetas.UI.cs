@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System.Diagnostics;
 using System.Drawing.Drawing2D; // Necesario para bordes avanzados y banderas circulares
 using System.Runtime.InteropServices;
@@ -151,11 +151,139 @@ namespace FolderLocker
 
         #endregion
 
-        #region 3. WIN32 API (Arrastre de Ventana)
+        #region 3. WIN32 API (Gestión de Ventana, Multimonitor y Arrastre)
         [DllImport("user32.dll", EntryPoint = "ReleaseCapture")]
         private extern static void ReleaseCapture();
         [DllImport("user32.dll", EntryPoint = "SendMessage")]
         private extern static void SendMessage(System.IntPtr hwnd, int wmsg, int wparam, int lparam);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr MonitorFromWindow(IntPtr handle, uint flags);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+        private const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
+        private const int WM_GETMINMAXINFO = 0x0024;
+        private const int WM_NCHITTEST = 0x0084;
+        private const int HTCLIENT = 1;
+        private const int HTLEFT = 10;
+        private const int HTRIGHT = 11;
+        private const int HTTOP = 12;
+        private const int HTTOPLEFT = 13;
+        private const int HTTOPRIGHT = 14;
+        private const int HTBOTTOM = 15;
+        private const int HTBOTTOMLEFT = 16;
+        private const int HTBOTTOMRIGHT = 17;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int x;
+            public int y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MINMAXINFO
+        {
+            public POINT ptReserved;
+            public POINT ptMaxSize;
+            public POINT ptMaxPosition;
+            public POINT ptMinTrackSize;
+            public POINT ptMaxTrackSize;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+        private struct MONITORINFO
+        {
+            public int cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public int dwFlags;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left, Top, Right, Bottom;
+        }
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams cp = base.CreateParams;
+                cp.Style |= 0x00020000; // WS_MINIMIZEBOX (minimizar con clic en la barra de tareas)
+                cp.Style |= 0x00010000; // WS_MAXIMIZEBOX
+                return cp;
+            }
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            // 1. Multimonitor: Manejo exacto de límites de maximización sin desbordamiento
+            if (m.Msg == WM_GETMINMAXINFO)
+            {
+                WmGetMinMaxInfo(m.HWnd, m.LParam);
+                m.Result = IntPtr.Zero;
+                return;
+            }
+
+            // 2. Redimensionamiento desde los bordes (cuando está en modo Normal)
+            if (m.Msg == WM_NCHITTEST && this.WindowState == FormWindowState.Normal)
+            {
+                base.WndProc(ref m);
+                if (m.Result == (IntPtr)HTCLIENT)
+                {
+                    Point screenPt = new Point(m.LParam.ToInt32());
+                    Point clientPt = this.PointToClient(screenPt);
+                    int borderSize = 6;
+
+                    bool isLeft = clientPt.X <= borderSize;
+                    bool isRight = clientPt.X >= this.ClientSize.Width - borderSize;
+                    bool isTop = clientPt.Y <= borderSize;
+                    bool isBottom = clientPt.Y >= this.ClientSize.Height - borderSize;
+
+                    if (isTop && isLeft) { m.Result = (IntPtr)HTTOPLEFT; return; }
+                    if (isTop && isRight) { m.Result = (IntPtr)HTTOPRIGHT; return; }
+                    if (isBottom && isLeft) { m.Result = (IntPtr)HTBOTTOMLEFT; return; }
+                    if (isBottom && isRight) { m.Result = (IntPtr)HTBOTTOMRIGHT; return; }
+                    if (isLeft) { m.Result = (IntPtr)HTLEFT; return; }
+                    if (isRight) { m.Result = (IntPtr)HTRIGHT; return; }
+                    if (isTop) { m.Result = (IntPtr)HTTOP; return; }
+                    if (isBottom) { m.Result = (IntPtr)HTBOTTOM; return; }
+                }
+                return;
+            }
+
+            base.WndProc(ref m);
+        }
+
+        private void WmGetMinMaxInfo(IntPtr hwnd, IntPtr lParam)
+        {
+            IntPtr monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            if (monitor != IntPtr.Zero)
+            {
+                MONITORINFO monitorInfo = new MONITORINFO();
+                monitorInfo.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+                if (GetMonitorInfo(monitor, ref monitorInfo))
+                {
+                    MINMAXINFO mmi = (MINMAXINFO)Marshal.PtrToStructure(lParam, typeof(MINMAXINFO));
+
+                    // Posición y tamaño en relación al monitor de destino
+                    mmi.ptMaxPosition.x = Math.Abs(monitorInfo.rcWork.Left - monitorInfo.rcMonitor.Left);
+                    mmi.ptMaxPosition.y = Math.Abs(monitorInfo.rcWork.Top - monitorInfo.rcMonitor.Top);
+                    mmi.ptMaxSize.x = Math.Abs(monitorInfo.rcWork.Right - monitorInfo.rcWork.Left);
+                    mmi.ptMaxSize.y = Math.Abs(monitorInfo.rcWork.Bottom - monitorInfo.rcWork.Top);
+
+                    // Tamaño mínimo para evitar que los controles se amontonen
+                    mmi.ptMinTrackSize.x = Math.Max(this.MinimumSize.Width, 1000);
+                    mmi.ptMinTrackSize.y = Math.Max(this.MinimumSize.Height, 680);
+
+                    Marshal.StructureToPtr(mmi, lParam, true);
+                }
+            }
+        }
         #endregion
 
         #region 4. INICIALIZACIÓN (Entry Point)
@@ -443,7 +571,7 @@ namespace FolderLocker
             TraerControlesVentanaAlFrente();
         }
 
-        // --- LÓGICA DE CENTRADO CORREGIDA ---
+        // --- LÓGICA DE CENTRADO CORREGIDA Y RESPONSIVA ---
         public void RecentrarPaneles()
         {
             if (this.WindowState == FormWindowState.Minimized) return;
@@ -451,10 +579,10 @@ namespace FolderLocker
             // Congelamos el pintado global del formulario para evitar parpadeos
             this.SuspendLayout();
 
-            // 1. Login y Registro (Lógica existente)
+            // 1. Login y Registro (Lógica existente protegida)
             if (panelLogin != null && panelLogin.Visible)
             {
-                int mitad = this.ClientSize.Width / 2;
+                int mitad = Math.Max(460, this.ClientSize.Width / 2);
                 if (pnlLoginLeft != null)
                 {
                     pnlLoginLeft.Width = mitad;
@@ -481,7 +609,7 @@ namespace FolderLocker
                 // Forzar dimensiones
                 int sidebarW = (PanelOpciones != null && PanelOpciones.Visible) ? PanelOpciones.Width : 0;
                 panel1.Location = new Point(sidebarW, 0);
-                panel1.Width = this.ClientSize.Width - sidebarW;
+                panel1.Width = Math.Max(100, this.ClientSize.Width - sidebarW);
                 panel1.Height = this.ClientSize.Height;
 
                 int pW = panel1.Width;
@@ -499,6 +627,7 @@ namespace FolderLocker
                     CentrarPanelSimpleAbsoluto(panelMontar, pW, pH);
                     CentrarPanelSimpleAbsoluto(panelManual, pW, pH);
                     CentrarPanelSimpleAbsoluto(panelSetup, pW, pH);
+                    CentrarPanelSimpleAbsoluto(panelCreditos, pW, pH);
                 }
             }
 
@@ -508,7 +637,7 @@ namespace FolderLocker
 
         // --- HELPERS DE CENTRADO ---
 
-        // Este helper fuerza la posición al centro exacto (Matemática Pura)
+        // Este helper fuerza la posición al centro exacto con márgenes de seguridad para no amontonarse
         private void CentrarPanelSimpleAbsoluto(Panel contenedor, int pW, int pH)
         {
             if (contenedor == null || !contenedor.Visible) return;
@@ -518,34 +647,21 @@ namespace FolderLocker
 
             if (card != null)
             {
-                // 1. Calculamos el centro para la Tarjeta
-                int cardX = (pW - card.Width) / 2;
-                int cardY = (pH - card.Height) / 2;
+                int cardX = Math.Max(20, (pW - card.Width) / 2);
+                int cardY = Math.Max(70, (pH - card.Height) / 2);
 
-                // Aplicamos margen mínimo superior (para que no se pegue al techo en pantallas chicas)
-                if (cardY < 80) cardY = 80;
-
-                // 2. Movemos la Tarjeta
                 card.Location = new Point(cardX, cardY);
 
-                // 3. Movemos el Título (pegado arriba a la izquierda de la tarjeta, o centrado)
                 if (title != null)
                 {
-                    // Opción A: Título alineado a la izquierda de la tarjeta (Más ordenado)
-                    // title.Location = new Point(cardX, cardY - 50);
-
-                    // Opción B: Título centrado respecto a la tarjeta (Más estético)
-                    int titleX = cardX + (card.Width - title.Width) / 2; // Centrado con la tarjeta
-                                                                         // O si prefieres centrado con la pantalla: int titleX = (pW - title.Width) / 2;
-
-                    title.Location = new Point(cardX, cardY - 50); // 50px arriba de la tarjeta
+                    title.Location = new Point(cardX, cardY - 45);
                 }
             }
         }
 
         private void CentrarPanelConTabs(int pW, int pH)
         {
-            int gapHeader = 110;
+            int gapHeader = 100;
             Control activeCard = null;
             if (panelFormulario != null && panelFormulario.Visible) activeCard = FindCard(panelFormulario);
             else if (panelRestaurar != null && panelRestaurar.Visible) activeCard = FindCard(panelRestaurar);
@@ -553,24 +669,22 @@ namespace FolderLocker
             if (activeCard != null)
             {
                 int totalH = gapHeader + activeCard.Height;
-                int startY = (pH - totalH) / 2;
-                if (startY < 40) startY = 40; // Margen de seguridad
-
-                int xCard = (pW - activeCard.Width) / 2;
+                int startY = Math.Max(30, (pH - totalH) / 2);
+                int xCard = Math.Max(20, (pW - activeCard.Width) / 2);
 
                 // Mover tarjeta
                 activeCard.Location = new Point(xCard, startY + gapHeader);
 
                 // Mover Header Global
-                if (lblBienvenido != null) lblBienvenido.Location = new Point(xCard, startY); // Alineado izquierda tarjeta
+                if (lblBienvenido != null) lblBienvenido.Location = new Point(xCard, startY);
 
-                if (btnProteger != null) btnProteger.Location = new Point(xCard, startY + 50);
-                if (btnDejarDeProteger != null) btnDejarDeProteger.Location = new Point(xCard + 150, startY + 50);
+                if (btnProteger != null) btnProteger.Location = new Point(xCard, startY + 45);
+                if (btnDejarDeProteger != null) btnDejarDeProteger.Location = new Point(xCard + 150, startY + 45);
 
                 if (separatorLine != null && btnProteger != null && btnDejarDeProteger != null)
                 {
                     int xSep = (panelFormulario != null && panelFormulario.Visible) ? btnProteger.Location.X : btnDejarDeProteger.Location.X;
-                    separatorLine.Location = new Point(xSep, startY + 95);
+                    separatorLine.Location = new Point(xSep, startY + 90);
                 }
             }
         }
@@ -592,7 +706,9 @@ namespace FolderLocker
         private void CenterControlInPanel(Panel parent, Control child)
         {
             if (parent == null || child == null) return;
-            child.Location = new Point((parent.Width - child.Width) / 2, (parent.Height - child.Height) / 2);
+            int x = Math.Max(10, (parent.Width - child.Width) / 2);
+            int y = Math.Max(30, (parent.Height - child.Height) / 2);
+            child.Location = new Point(x, y);
         }
 
         public class CircularPictureBox : PictureBox
@@ -1605,53 +1721,22 @@ namespace FolderLocker
             this.Controls.Add(btnMin);
         }
 
-        // --- LÓGICA DE MAXIMIZAR ---
+        // --- LÓGICA DE MAXIMIZAR Y RESTAURAR ---
         private void EjecutarMaximizar()
         {
             try
             {
-                // Detectar el monitor que contiene la mayor parte de la ventana
-                Screen currentScreen = Screen.FromRectangle(this.Bounds);
-                Rectangle workingArea = currentScreen.WorkingArea;
-                this.MaximizedBounds = workingArea;
-
-                // Establecer correctamente los límites máximos
-                this.MaximizedBounds = new Rectangle(
-                    workingArea.X,
-                    workingArea.Y,
-                    workingArea.Width,
-                    workingArea.Height
-                );
-
-                // Cambiar el estado
                 if (this.WindowState == FormWindowState.Normal)
                 {
-                    this.StartPosition = FormStartPosition.Manual;
-
-                    // Reposicionar exactamente dentro de los límites del monitor actual
-                    this.Location = new Point(workingArea.X, workingArea.Y);
-                    this.Size = new Size(workingArea.Width, workingArea.Height);
-
                     this.WindowState = FormWindowState.Maximized;
-
-                    if (btnMax != null)
-                        btnMax.Text = "❐";
+                    if (btnMax != null) btnMax.Text = "🗗";
                 }
                 else
                 {
                     this.WindowState = FormWindowState.Normal;
-                    if (btnMax != null)
-                        btnMax.Text = "🗖";
-
-                    // Restaurar centrado en el monitor actual
-                    this.StartPosition = FormStartPosition.Manual;
-                    this.Location = new Point(
-                        workingArea.X + (workingArea.Width - this.Width) / 2,
-                        workingArea.Y + (workingArea.Height - this.Height) / 2
-                    );
+                    if (btnMax != null) btnMax.Text = "🗖";
                 }
 
-                // Mantener los paneles correctamente centrados
                 RecentrarPaneles();
             }
             catch (Exception ex)
@@ -1660,7 +1745,7 @@ namespace FolderLocker
             }
         }
 
-        // --- GESTIÓN INTELIGENTE DEL MOUSE (SOLUCIÓN DOBLE CLIC) ---
+        // --- GESTIÓN INTELIGENTE DEL MOUSE (ARRASTRE SUAVE Y MULTIPANTALLA) ---
 
         private void HabilitarArrastreGlobal()
         {
@@ -1702,52 +1787,78 @@ namespace FolderLocker
             c.MouseDoubleClick += OnSmartDoubleClick;
         }
 
-        // Lógica de Arrastre (Mantiene la restricción de 40px)
+        // Inicia el arrastre de la ventana. Si está maximizada, la restaura suavemente ("se hace chica")
+        // bajo la posición del cursor para que el arrastre a otra pantalla sea 100% natural.
+        private void IniciarArrastreVentana(MouseEventArgs e = null)
+        {
+            if (this.WindowState == FormWindowState.Maximized)
+            {
+                Point cursorPos = Cursor.Position;
+                Screen screen = Screen.FromPoint(cursorPos);
+
+                double ratioX = (double)(cursorPos.X - screen.WorkingArea.Left) / Math.Max(1, screen.WorkingArea.Width);
+                ratioX = Math.Clamp(ratioX, 0.05, 0.95);
+
+                this.WindowState = FormWindowState.Normal;
+                if (btnMax != null) btnMax.Text = "🗖";
+
+                int clickY = (e != null) ? Math.Min(e.Y, 25) : 15;
+                int newX = cursorPos.X - (int)(this.Width * ratioX);
+                int newY = cursorPos.Y - clickY;
+
+                newX = Math.Max(screen.WorkingArea.Left, Math.Min(newX, screen.WorkingArea.Right - this.Width));
+                newY = Math.Max(screen.WorkingArea.Top, newY);
+
+                this.Location = new Point(newX, newY);
+            }
+
+            ReleaseCapture();
+            SendMessage(this.Handle, 0xA1, 0x2, 0);
+        }
+
+        // Lógica de Arrastre para controles que usan MoverVentana
         private void MoverVentana(object sender, MouseEventArgs e)
         {
             if (e.Button != MouseButtons.Left) return;
 
-            // Filtro de Zona para Arrastre
-            bool esZonaTitulo = (sender is Label) || (e.Y <= 40);
-
-            if (esZonaTitulo)
+            if (e.Clicks == 2)
             {
-                ReleaseCapture();
-                SendMessage(this.Handle, 0xA1, 0x2, 0);
+                EjecutarMaximizar();
+                return;
+            }
+
+            Point ptOnForm = this.PointToClient(Cursor.Position);
+            if (ptOnForm.Y <= 50)
+            {
+                IniciarArrastreVentana(e);
             }
         }
 
-        // 1. Mouse Down: Solo tomamos nota de la posición, NO movemos aún.
+        // 1. Mouse Down: Tomamos nota de la posición sin bloquear el doble clic
         private void OnSmartMouseDown(object sender, MouseEventArgs e)
         {
             if (e.Button != MouseButtons.Left) return;
 
-            // Validar Zona Segura (Top 40px)
-            bool esZonaTitulo = (sender is Label) || (e.Y <= 40);
-
-            if (esZonaTitulo)
+            Point ptOnForm = this.PointToClient(Cursor.Position);
+            if (ptOnForm.Y <= 50)
             {
                 _isMouseDown = true;
                 _dragStartPoint = e.Location;
             }
         }
 
-        // 2. Mouse Move: Solo iniciamos el arrastre si se mueve el mouse (Intención de arrastrar)
+        // 2. Mouse Move: Si se mueve más de 5 píxeles, inicia el arrastre fluido
         private void OnSmartMouseMove(object sender, MouseEventArgs e)
         {
             if (_isMouseDown)
             {
-                // Calcular distancia movida
                 int deltaX = Math.Abs(e.X - _dragStartPoint.X);
                 int deltaY = Math.Abs(e.Y - _dragStartPoint.Y);
 
-                // Si se mueve más de 5 pixeles, asumimos que quiere arrastrar
-                // Esto deja "espacio" para que el doble clic ocurra si no se mueve el mouse
                 if (deltaX > 5 || deltaY > 5)
                 {
-                    _isMouseDown = false; // Ya no estamos esperando clic, estamos arrastrando
-                    ReleaseCapture();
-                    SendMessage(this.Handle, 0xA1, 0x2, 0);
+                    _isMouseDown = false;
+                    IniciarArrastreVentana(e);
                 }
             }
         }
@@ -1758,13 +1869,13 @@ namespace FolderLocker
             _isMouseDown = false;
         }
 
-        // 4. Doble Clic: Ahora sí llega libremente porque el MouseDown no bloqueó el hilo
+        // 4. Doble Clic: Maximiza o restaura si se hace en la barra superior
         private void OnSmartDoubleClick(object sender, MouseEventArgs e)
         {
             if (e.Button != MouseButtons.Left) return;
 
-            bool esZonaTitulo = (sender is Label) || (e.Y <= 40);
-            if (esZonaTitulo)
+            Point ptOnForm = this.PointToClient(Cursor.Position);
+            if (ptOnForm.Y <= 45)
             {
                 EjecutarMaximizar();
             }

@@ -75,7 +75,7 @@ namespace FolderLocker
         private void FormCarpetas_Load(object sender, EventArgs e)
         {
             // Configuración de Pantalla
-            this.MaximizedBounds = Screen.FromHandle(this.Handle).WorkingArea;
+            this.MinimumSize = new Size(1000, 680);
             this.WindowState = FormWindowState.Maximized;
 
             // 1. Cargar Idioma
@@ -794,8 +794,18 @@ namespace FolderLocker
 
         private void FormCarpetas_Resize(object sender, EventArgs e)
         {
-            if (this.WindowState == FormWindowState.Minimized) this.Hide();
-            else RecentrarPaneles();
+            if (this.WindowState == FormWindowState.Minimized)
+            {
+                this.Hide();
+            }
+            else
+            {
+                if (btnMax != null)
+                {
+                    btnMax.Text = (this.WindowState == FormWindowState.Maximized) ? "🗗" : "🗖";
+                }
+                RecentrarPaneles();
+            }
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)

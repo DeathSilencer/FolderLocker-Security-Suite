@@ -17,19 +17,19 @@ namespace FolderLocker
 
         private const int SW_RESTORE = 9;
 
-        // Identificador único para que Windows sepa si ya estamos corriendo
+        // Identificador Ãºnico para que Windows sepa si ya estamos corriendo
         static readonly string MutexName = "FolderLocker_App_Mutex_v5_Unique_ID";
 
         [STAThread]
         static void Main()
         {
-            // Intentamos reservar el identificador único (Mutex)
+            // Intentamos reservar el identificador Ãºnico (Mutex)
             using (Mutex mutex = new Mutex(true, MutexName, out bool createdNew))
             {
                 if (createdNew)
                 {
                     // --- SOY LA PRIMERA INSTANCIA (Arranca normal) ---
-                    // Aquí está tu código original:
+                    Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
                     Application.EnableVisualStyles();
                     Application.SetCompatibleTextRenderingDefault(false);
                     Application.Run(new FormCarpetas());
@@ -44,7 +44,7 @@ namespace FolderLocker
                         {
                             IntPtr handle = process.MainWindowHandle;
 
-                            // Si la otra ventana está minimizada, la restauramos
+                            // Si la otra ventana estÃ¡ minimizada, la restauramos
                             if (IsIconic(handle))
                             {
                                 ShowWindowAsync(handle, SW_RESTORE);
