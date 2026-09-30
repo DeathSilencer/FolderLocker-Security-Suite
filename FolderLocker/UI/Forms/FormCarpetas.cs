@@ -97,7 +97,6 @@ namespace FolderLocker
 
         private async void BtnAccionBloquear_Click(object sender, EventArgs e)
         {
-            // Validaciones Básicas (Igual que antes)
             if (string.IsNullOrEmpty(txtRuta.Text)) { DarkDialogs.ShowInfo(Localization.Get("msg_select_dir")); return; }
             if (EsRutaProhibida(txtRuta.Text, out string errorSeguridad)) { DarkDialogs.ShowInfo(errorSeguridad, Localization.Get("err_security_title")); return; }
 
@@ -114,41 +113,27 @@ namespace FolderLocker
                 return;
             }
 
-            // Validaciones de Usuario
             if (!UserManager.Login(UserManager.CurrentUser.Username, txtContrasena.Text))
             {
                 DarkDialogs.ShowInfo(Localization.Get("msg_pass_wrong"), Localization.Get("title_error"));
                 return;
             }
 
-            // --- CAMBIO 1: REGISTRO PREVENTIVO (SAFETY FIRST) ---
-            // Si ocurre un apagón, la carpeta YA estará en la lista del usuario.
-            // Esto permite que al reiniciar, el usuario vea la carpeta y pueda darle a "Restaurar" 
-            // para arreglar cualquier archivo a medio procesar.
-
             bool esNuevaProteccion = !UserManager.CurrentUser.LockedFolders.Contains(txtRuta.Text);
 
             if (esNuevaProteccion)
             {
-                // Agregamos a la lista visualmente y en DB antes de tocar un solo byte
                 UserManager.CurrentUser.LockedFolders.Add(txtRuta.Text);
                 UserManager.SaveDatabase();
             }
-            else
-            {
-                // Si ya estaba en la lista, avisamos pero permitimos continuar (Modo Reparación/Reintento)
-                // Esto es vital para tu escenario: Si se fue la luz, el usuario vuelve a darle "Proteger" para terminar el trabajo.
-            }
 
-            // Ocultamos la carpeta INMEDIATAMENTE para que Windows no indexe mientras ciframos
             try
             {
-                CrearMarcador(txtRuta.Text); // Crea el locker.id con el OWNER
+                CrearMarcador(txtRuta.Text);
                 new DirectoryInfo(txtRuta.Text).Attributes = FileAttributes.Hidden | FileAttributes.System;
             }
             catch { }
 
-            // UI Procesando
             ConfigurarUIProcesando(true);
 
             try
@@ -161,7 +146,6 @@ namespace FolderLocker
                         progresoActivo.Actualizar(data.Item1, data.Item2);
                 });
 
-                // Verificamos propiedad si ya existe el marcador
                 if (EsCarpetaYaProtegidaFisicamente(txtRuta.Text) && !EsElPropietario(txtRuta.Text))
                 {
                     CerrarBarraProgreso();
@@ -169,33 +153,34 @@ namespace FolderLocker
                     return;
                 }
 
-                // Llamamos al nuevo proceso blindado
                 await ProcesarArchivosAsync(txtRuta.Text, txtContrasena.Text, true, progressHandler);
 
                 CerrarBarraProgreso();
 
+                // 1. Notificación de Windows (Usando texto del diccionario)
+                trayIcon.ShowBalloonTip(3000, "FolderLocker", Localization.Get("msg_lock_success"), ToolTipIcon.Info);
+
                 if (!this.Visible)
                 {
-                    trayIcon.ShowBalloonTip(5000, Localization.Get("tray_done"), Localization.Get("tray_done_lock"), ToolTipIcon.Info);
                     RestaurarVentana();
                 }
                 else
                 {
-                    DarkDialogs.ShowInfo(Localization.Get("msg_lock_success"), Localization.Get("title_success"));
+                    ForzarPrimerPlano();
+                    // 2. Ventana emergente (Usando texto del diccionario)
+                    // Título: "Éxito" (title_success), Mensaje: "Carpeta encriptada..." (msg_lock_success)
+                    DarkDialogs.ShowInfo(Localization.Get("msg_lock_success"), Localization.Get("title_success"), this);
                 }
 
                 txtContrasena.Text = "";
                 txtRuta.Text = "";
 
-                // Refrescamos listas si están visibles
                 if (panelMontar.Visible) ActualizarYMostrarPanelMontar();
                 if (panelRestaurar.Visible) ActualizarYMostrarPanelRestaurar();
             }
             catch (Exception ex)
             {
                 CerrarBarraProgreso();
-                // Si falla algo crítico, NO quitamos la carpeta de la lista.
-                // Es mejor que el usuario tenga acceso a "Restaurar" para intentar arreglarlo.
                 DarkDialogs.ShowInfo("Hubo una interrupción: " + ex.Message + "\n\nLa carpeta se ha guardado en tu lista para que puedas intentar Restaurarla o Protegerla nuevamente.");
             }
             finally
@@ -204,6 +189,7 @@ namespace FolderLocker
                 ConfigurarUIProcesando(false);
             }
         }
+
 
         #endregion
 
@@ -276,6 +262,9 @@ namespace FolderLocker
                     // 2. Siempre aseguramos que la ventana esté visible y al frente
                     RestaurarVentana();
 
+                    // Pequeña pausa de seguridad para que la UI termine de pintarse antes de lanzar el popup
+                    Application.DoEvents();
+
                     // 3. Mostramos el resultado "Pegado" a la ventana principal (pasamos 'this')
                     // Al pasar 'this', DarkDialogs usará CenterParent.
                     DarkDialogs.ShowResultWithCopy(Localization.Get("msg_decrypt_success"), rutaSeleccionada, this);
@@ -321,7 +310,7 @@ namespace FolderLocker
                 this.Hide();
                 trayIcon.ShowBalloonTip(3000, Localization.Get("tray_working"), Localization.Get("tray_working_desc"), ToolTipIcon.Info);
             };
-            progresoActivo.Show();
+            progresoActivo.Show(this);
         }
 
         private void CerrarBarraProgreso()

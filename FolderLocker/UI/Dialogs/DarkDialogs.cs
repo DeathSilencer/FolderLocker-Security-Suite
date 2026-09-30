@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 
 namespace FolderLocker
 {
@@ -40,7 +40,7 @@ namespace FolderLocker
         #region MÉTODOS PÚBLICOS
 
         // 1. INFORMACIÓN (Enter o Esc cierran)
-        public static void ShowInfo(string mensaje, string titulo = "Info")
+        public static void ShowInfo(string mensaje, string titulo = "Info", FormCarpetas formCarpetas = null)
         {
             var lbl = CrearLabel(mensaje, 20, 55, 360);
             int altura = Math.Max(200, 120 + lbl.PreferredHeight);
@@ -56,7 +56,15 @@ namespace FolderLocker
             form.AcceptButton = btnOk; // Enter activa este botón
             form.CancelButton = btnOk; // Esc activa este botón (porque solo hay uno)
 
-            form.ShowDialog();
+            if (formCarpetas != null)
+            {
+                form.StartPosition = FormStartPosition.CenterParent;
+                form.ShowDialog(formCarpetas);
+            }
+            else
+            {
+                form.ShowDialog();
+            }
         }
 
         // 2. CONFIRMACIÓN (Enter = Sí, Esc = No)

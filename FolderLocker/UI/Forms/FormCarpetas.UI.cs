@@ -1817,17 +1817,44 @@ namespace FolderLocker
 
         private void RestaurarVentana()
         {
-            this.Show();
-            this.WindowState = FormWindowState.Maximized;
+            // 1. Asegurar que la ventana principal es visible y no está minimizada
+            if (!this.Visible) this.Show();
+            if (this.WindowState == FormWindowState.Minimized) this.WindowState = FormWindowState.Normal;
+
+            // 2. Traer al frente y activar (Truco para forzar foco en Windows)
             this.BringToFront();
             this.Activate();
 
+            // 3. Si hay una barra de progreso activa, traerla también
             if (progresoActivo != null && !progresoActivo.IsDisposed)
             {
-                progresoActivo.Show();
+                progresoActivo.Show(); // Asegura que no esté oculta
                 progresoActivo.BringToFront();
             }
-            RecentrarPaneles();
+
+            // 4. Refrescar la UI por si acaso quedó "congelada" visualmente
+            this.Refresh();
+        }
+
+        private void ForzarPrimerPlano()
+        {
+            // 1. Asegurar que la ventana es visible y no está minimizada
+            if (!this.Visible) this.Show();
+            if (this.WindowState == FormWindowState.Minimized) this.WindowState = FormWindowState.Normal;
+
+            // 2. EL TRUCO MAESTRO:
+            // Hacemos la ventana "TopMost" (Siempre visible) momentáneamente.
+            // Esto obliga a Windows a pintarla encima de Chrome, Word, etc.
+            this.TopMost = true;
+            this.TopMost = false; // La apagamos inmediatamente para que no moleste después.
+
+            // 3. Reclamar el foco
+            this.Activate();
+            this.BringToFront();
+
+            // 4. Refrescar para asegurar que se pinte antes de sacar el Popup
+            this.Refresh();
+            Application.DoEvents();
         }
 
         private void TraerControlesVentanaAlFrente()
