@@ -68,20 +68,23 @@ namespace FolderLocker
         }
 
         // 2. CONFIRMACIÓN (Enter = Sí, Esc = No)
-        public static DialogResult ShowConfirm(string mensaje, string titulo = "Confirm")
+        public static DialogResult ShowConfirm(string mensaje, string titulo = "Confirm", IWin32Window? owner = null, int ancho = 400, bool alinearIzquierda = false)
         {
-            var lbl = CrearLabel(mensaje, 20, 55, 360);
-            int altura = Math.Max(220, 120 + lbl.PreferredHeight);
+            var lbl = CrearLabel(mensaje, 20, 55, ancho - 40);
+            if (alinearIzquierda) lbl.TextAlign = ContentAlignment.TopLeft;
 
-            using var form = CrearBase(titulo, 400, altura);
+            int altura = Math.Max(220, 130 + lbl.PreferredHeight);
+
+            using var form = CrearBase(titulo, ancho, altura);
             form.Controls.Add(lbl);
 
             int yBotones = altura - 60;
+            int espaciado = Math.Max(20, (ancho - 320) / 3);
 
-            var btnSi = CrearBoton(Localization.Get("btn_yes"), Theme.AccentRed, 40, yBotones);
+            var btnSi = CrearBoton(Localization.Get("btn_yes"), Theme.AccentRed, espaciado, yBotones);
             btnSi.DialogResult = DialogResult.Yes;
 
-            var btnNo = CrearBoton(Localization.Get("btn_cancel"), Theme.NeutralButton, 210, yBotones);
+            var btnNo = CrearBoton(Localization.Get("btn_cancel"), Theme.NeutralButton, espaciado * 2 + 150, yBotones);
             btnNo.DialogResult = DialogResult.No;
 
             form.Controls.AddRange(new Control[] { btnSi, btnNo });
@@ -93,6 +96,12 @@ namespace FolderLocker
             // Por seguridad, el foco inicial va al "No", pero Enter sigue activando el "Sí"
             // (Windows prefiere que el foco coincida con AcceptButton, pero esto es más seguro para datos)
             form.ActiveControl = btnNo;
+
+            if (owner != null)
+            {
+                form.StartPosition = FormStartPosition.CenterParent;
+                return form.ShowDialog(owner);
+            }
 
             return form.ShowDialog();
         }

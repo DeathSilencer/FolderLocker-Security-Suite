@@ -144,7 +144,83 @@ namespace FolderLocker
 
             if (!UserManager.Login(UserManager.CurrentUser.Username, contrasena))
             {
-                DarkDialogs.ShowInfo(Localization.Get("msg_pass_wrong"), Localization.Get("title_error"));
+                DarkDialogs.ShowInfo(Localization.Get("msg_pass_wrong"), Localization.Get("title_error"), this);
+                return;
+            }
+
+            // --- ESCANEO RÁPIDO Y RESUMEN PREVIO DE LA CARPETA ---
+            int totalArchivos = 0;
+            long totalBytes = 0;
+
+            try
+            {
+                foreach (var f in Directory.EnumerateFiles(ruta, "*.*", SearchOption.AllDirectories))
+                {
+                    string n = Path.GetFileName(f).ToLowerInvariant();
+                    if (n != "locker.id" && n != "dir.idx" && !n.EndsWith(".tmp"))
+                    {
+                        try
+                        {
+                            totalBytes += new FileInfo(f).Length;
+                            totalArchivos++;
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DarkDialogs.ShowInfo("Error al escanear la carpeta: " + ex.Message, "Error", this);
+                return;
+            }
+
+            if (totalArchivos == 0)
+            {
+                DarkDialogs.ShowInfo("La carpeta está vacía. No se puede proteger.", "Carpeta vacía", this);
+                return;
+            }
+
+            // Estimación y formato
+            string tamanoTexto = FormatearTamano(totalBytes);
+            string tiempoEstimado = EstimarTiempo(totalArchivos, totalBytes);
+            bool esVolumenGrande = totalArchivos >= 500 || totalBytes >= 500L * 1024 * 1024; // >500 archivos o >500 MB
+
+            string tituloConfirm = esVolumenGrande
+                ? (Localization.CurrentLang == "EN" ? "⚠️ Warning: Large File Volume" : "⚠️ Advertencia: Gran Volumen de Archivos")
+                : (Localization.CurrentLang == "EN" ? "Confirm Protection" : "Confirmar Protección");
+
+            string advertenciaExtra = esVolumenGrande
+                ? (Localization.CurrentLang == "EN"
+                    ? "\n⚠️ NOTICE: This folder contains a significant number of files or large size. Please verify this is the exact folder you want to protect.\n"
+                    : "\n⚠️ AVISO: Esta carpeta contiene una gran cantidad de archivos o peso. Verifica que sea la carpeta correcta antes de continuar.\n")
+                : "";
+
+            string mensajeResumen;
+            if (Localization.CurrentLang == "EN")
+            {
+                mensajeResumen = $"Folder Protection Summary:\n\n" +
+                                 $"📁 Folder: {Path.GetFileName(ruta)}\n" +
+                                 $"📍 Path: {ruta}\n" +
+                                 $"📄 Total Files: {totalArchivos:N0}\n" +
+                                 $"💾 Total Size: {tamanoTexto}\n" +
+                                 $"⏱️ Estimated Time: {tiempoEstimado}\n" +
+                                 advertenciaExtra + "\n" +
+                                 "Do you want to proceed with encryption?";
+            }
+            else
+            {
+                mensajeResumen = $"Resumen de la carpeta a proteger:\n\n" +
+                                 $"📁 Carpeta: {Path.GetFileName(ruta)}\n" +
+                                 $"📍 Ruta: {ruta}\n" +
+                                 $"📄 Total de archivos: {totalArchivos:N0}\n" +
+                                 $"💾 Tamaño total: {tamanoTexto}\n" +
+                                 $"⏱️ Tiempo estimado: {tiempoEstimado}\n" +
+                                 advertenciaExtra + "\n" +
+                                 "¿Deseas iniciar la encriptación ahora?";
+            }
+
+            if (DarkDialogs.ShowConfirm(mensajeResumen, tituloConfirm, this, ancho: 480, alinearIzquierda: true) != DialogResult.Yes)
+            {
                 return;
             }
 
@@ -883,6 +959,39 @@ namespace FolderLocker
             if (ruta.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.Windows), StringComparison.OrdinalIgnoreCase)) { msg = Localization.Get("err_sys"); return true; }
 
             return false;
+        }
+
+        private string FormatearTamano(long bytes)
+        {
+            string[] sufijos = { "B", "KB", "MB", "GB", "TB" };
+            int i = 0;
+            double dBytes = bytes;
+            while (dBytes >= 1024 && i < sufijos.Length - 1)
+            {
+                dBytes /= 1024;
+                i++;
+            }
+            return $"{dBytes:0.##} {sufijos[i]}";
+        }
+
+        private string EstimarTiempo(int numArchivos, long bytes)
+        {
+            double segPorBytes = (double)bytes / (30.0 * 1024 * 1024);
+            double segPorArchivos = (double)numArchivos / 600.0;
+            double segundosTotales = Math.Max(segPorBytes, segPorArchivos);
+
+            if (segundosTotales < 5)
+                return Localization.CurrentLang == "EN" ? "Less than 5 seconds" : "Menos de 5 segundos";
+            if (segundosTotales < 60)
+                return Localization.CurrentLang == "EN" ? $"Approx. {(int)Math.Ceiling(segundosTotales)} seconds" : $"Aprox. {(int)Math.Ceiling(segundosTotales)} segundos";
+
+            int minutos = (int)Math.Ceiling(segundosTotales / 60.0);
+            if (minutos < 60)
+                return Localization.CurrentLang == "EN" ? $"Approx. {minutos} minute(s)" : $"Aprox. {minutos} {(minutos == 1 ? "minuto" : "minutos")}";
+
+            int horas = minutos / 60;
+            int minsRestantes = minutos % 60;
+            return Localization.CurrentLang == "EN" ? $"Approx. {horas}h {minsRestantes}m" : $"Aprox. {horas}h {minsRestantes}m";
         }
 
         private void ModoConfiguracionInicial()
