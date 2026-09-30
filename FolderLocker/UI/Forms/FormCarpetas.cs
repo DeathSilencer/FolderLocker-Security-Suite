@@ -232,42 +232,8 @@ namespace FolderLocker
             string tiempoEstimado = EstimarTiempo(totalArchivos, totalBytes);
             bool esVolumenGrande = totalArchivos >= 500 || totalBytes >= 500L * 1024 * 1024; // >500 archivos o >500 MB
 
-            string tituloConfirm = esVolumenGrande
-                ? (Localization.CurrentLang == "EN" ? "⚠️ Warning: Large File Volume" : "⚠️ Advertencia: Gran Volumen de Archivos")
-                : (Localization.CurrentLang == "EN" ? "Confirm Protection" : "Confirmar Protección");
-
-            string advertenciaExtra = esVolumenGrande
-                ? (Localization.CurrentLang == "EN"
-                    ? "\n⚠️ NOTICE: This folder contains a significant number of files or large size. Please verify this is the exact folder you want to protect.\n"
-                    : "\n⚠️ AVISO: Esta carpeta contiene una gran cantidad de archivos o peso. Verifica que sea la carpeta correcta antes de continuar.\n")
-                : "";
-
-            string mensajeResumen;
-            if (Localization.CurrentLang == "EN")
-            {
-                mensajeResumen = $"Folder Protection Summary:\n\n" +
-                                 $"📁 Folder: {Path.GetFileName(ruta)}\n" +
-                                 $"📍 Path: {ruta}\n" +
-                                 $"📄 Total Files: {totalArchivos:N0}\n" +
-                                 $"💾 Total Size: {tamanoTexto}\n" +
-                                 $"⏱️ Estimated Time: {tiempoEstimado}\n" +
-                                 advertenciaExtra + "\n" +
-                                 "Do you want to proceed with encryption?";
-            }
-            else
-            {
-                mensajeResumen = $"Resumen de la carpeta a proteger:\n\n" +
-                                 $"📁 Carpeta: {Path.GetFileName(ruta)}\n" +
-                                 $"📍 Ruta: {ruta}\n" +
-                                 $"📄 Total de archivos: {totalArchivos:N0}\n" +
-                                 $"💾 Tamaño total: {tamanoTexto}\n" +
-                                 $"⏱️ Tiempo estimado: {tiempoEstimado}\n" +
-                                 advertenciaExtra + "\n" +
-                                 "¿Deseas iniciar la encriptación ahora?";
-            }
-
-            // 8. Confirmación con el usuario antes de proceder
-            if (DarkDialogs.ShowConfirm(mensajeResumen, tituloConfirm, this, ancho: 480, alinearIzquierda: true) != DialogResult.Yes)
+            // 8. Diálogo visual profesional con KPIs, tarjeta de ruta y callout
+            if (DarkDialogs.ShowPreScanSummary(this, ruta, totalArchivos, tamanoTexto, tiempoEstimado, esVolumenGrande) != DialogResult.Yes)
             {
                 return;
             }

@@ -106,6 +106,264 @@ namespace FolderLocker
             return form.ShowDialog();
         }
 
+        // 2.1. RESUMEN VISUAL DE PRE-ESCANEO (KPIs, Path Card y Callout)
+        public static DialogResult ShowPreScanSummary(
+            IWin32Window? owner,
+            string ruta,
+            int totalArchivos,
+            string tamanoTexto,
+            string tiempoEstimado,
+            bool esVolumenGrande)
+        {
+            int w = 530;
+            int h = esVolumenGrande ? 465 : 445;
+            string titulo = esVolumenGrande
+                ? (Localization.CurrentLang == "EN" ? "⚠️ Warning: Large File Volume" : "⚠️ Advertencia: Gran Volumen")
+                : (Localization.CurrentLang == "EN" ? "🛡️ Security Summary" : "🛡️ Resumen de Seguridad");
+
+            using var form = CrearBase(titulo, w, h);
+
+            // Botón cerrar en el header
+            var btnClose = new Button
+            {
+                Text = "✕",
+                Size = new Size(36, 30),
+                Location = new Point(w - 42, 5),
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.FromArgb(180, 170, 170),
+                BackColor = Color.Transparent,
+                Cursor = Cursors.Hand,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold)
+            };
+            btnClose.FlatAppearance.BorderSize = 0;
+            btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(198, 40, 40);
+            btnClose.Click += (s, e) => { form.DialogResult = DialogResult.No; form.Close(); };
+            if (form.Controls.Count > 0 && form.Controls[0] is Panel hdr)
+            {
+                hdr.Controls.Add(btnClose);
+                btnClose.BringToFront();
+            }
+
+            // 1. Tarjeta de Ruta
+            var pnlPath = new Panel
+            {
+                Location = new Point(25, 52),
+                Size = new Size(480, 56),
+                BackColor = Color.FromArgb(28, 25, 25)
+            };
+            pnlPath.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlPath.ClientRectangle, Color.FromArgb(50, 44, 44), ButtonBorderStyle.Solid);
+
+            var lblFolderIcon = new Label
+            {
+                Text = "📁",
+                Font = new Font("Segoe UI", 14),
+                Location = new Point(12, 12),
+                Size = new Size(30, 30),
+                BackColor = Color.Transparent
+            };
+            pnlPath.Controls.Add(lblFolderIcon);
+
+            var lblFolderName = new Label
+            {
+                Text = Path.GetFileName(ruta),
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(48, 8),
+                Size = new Size(420, 20),
+                AutoEllipsis = true,
+                BackColor = Color.Transparent
+            };
+            pnlPath.Controls.Add(lblFolderName);
+
+            var lblFullPath = new Label
+            {
+                Text = ruta,
+                Font = new Font("Segoe UI", 8),
+                ForeColor = Color.FromArgb(160, 150, 150),
+                Location = new Point(48, 30),
+                Size = new Size(420, 18),
+                AutoEllipsis = true,
+                BackColor = Color.Transparent
+            };
+            pnlPath.Controls.Add(lblFullPath);
+            form.Controls.Add(pnlPath);
+
+            // 2. Tres KPI Cards
+            int cardW = 153;
+            int cardH = 72;
+            int cardY = 118;
+
+            // KPI 1: Archivos
+            var pnlKpi1 = new Panel { Location = new Point(25, cardY), Size = new Size(cardW, cardH), BackColor = Color.FromArgb(28, 25, 25) };
+            pnlKpi1.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlKpi1.ClientRectangle, Color.FromArgb(50, 44, 44), ButtonBorderStyle.Solid);
+            var lblKpi1Tag = new Label
+            {
+                Text = "📄 " + (Localization.CurrentLang == "EN" ? "FILES" : "ARCHIVOS"),
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(160, 150, 150),
+                Location = new Point(10, 8),
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            var lblKpi1Val = new Label
+            {
+                Text = $"{totalArchivos:N0}",
+                Font = new Font("Segoe UI Black", 13, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(10, 28),
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlKpi1.Controls.AddRange(new Control[] { lblKpi1Tag, lblKpi1Val });
+            form.Controls.Add(pnlKpi1);
+
+            // KPI 2: Tamaño
+            var pnlKpi2 = new Panel { Location = new Point(188, cardY), Size = new Size(cardW, cardH), BackColor = Color.FromArgb(28, 25, 25) };
+            pnlKpi2.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlKpi2.ClientRectangle, Color.FromArgb(50, 44, 44), ButtonBorderStyle.Solid);
+            var lblKpi2Tag = new Label
+            {
+                Text = "💾 " + (Localization.CurrentLang == "EN" ? "TOTAL SIZE" : "TAMAÑO TOTAL"),
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(160, 150, 150),
+                Location = new Point(10, 8),
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            var lblKpi2Val = new Label
+            {
+                Text = tamanoTexto,
+                Font = new Font("Segoe UI Black", 13, FontStyle.Bold),
+                ForeColor = Theme.AccentRed,
+                Location = new Point(10, 28),
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlKpi2.Controls.AddRange(new Control[] { lblKpi2Tag, lblKpi2Val });
+            form.Controls.Add(pnlKpi2);
+
+            // KPI 3: Tiempo
+            var pnlKpi3 = new Panel { Location = new Point(352, cardY), Size = new Size(cardW, cardH), BackColor = Color.FromArgb(28, 25, 25) };
+            pnlKpi3.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlKpi3.ClientRectangle, Color.FromArgb(50, 44, 44), ButtonBorderStyle.Solid);
+            var lblKpi3Tag = new Label
+            {
+                Text = "⏱️ " + (Localization.CurrentLang == "EN" ? "EST. TIME" : "TIEMPO EST."),
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(160, 150, 150),
+                Location = new Point(10, 8),
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            var lblKpi3Val = new Label
+            {
+                Text = tiempoEstimado,
+                Font = new Font("Segoe UI Black", 11, FontStyle.Bold),
+                ForeColor = Color.FromArgb(56, 189, 248),
+                Location = new Point(10, 30),
+                Size = new Size(135, 34),
+                AutoEllipsis = true,
+                BackColor = Color.Transparent
+            };
+            pnlKpi3.Controls.AddRange(new Control[] { lblKpi3Tag, lblKpi3Val });
+            form.Controls.Add(pnlKpi3);
+
+            // 3. Banner de Seguridad o Advertencia
+            int bannerY = 200;
+            int bannerH = esVolumenGrande ? 76 : 62;
+            var pnlBanner = new Panel
+            {
+                Location = new Point(25, bannerY),
+                Size = new Size(480, bannerH),
+                BackColor = esVolumenGrande ? Color.FromArgb(42, 20, 20) : Color.FromArgb(20, 34, 25)
+            };
+            Color borderAccent = esVolumenGrande ? Theme.AccentRed : Color.FromArgb(16, 185, 129);
+            pnlBanner.Paint += (s, e) =>
+            {
+                ControlPaint.DrawBorder(e.Graphics, pnlBanner.ClientRectangle, Color.FromArgb(50, 44, 44), ButtonBorderStyle.Solid);
+                using var b = new SolidBrush(borderAccent);
+                e.Graphics.FillRectangle(b, 0, 0, 4, pnlBanner.Height);
+            };
+
+            var lblBannerText = new Label
+            {
+                Text = esVolumenGrande
+                    ? (Localization.CurrentLang == "EN"
+                        ? "⚠️ Notice: Large folder detected. The encryption process runs in transactional batches (Two-Phase Commit) to guarantee zero file loss."
+                        : "⚠️ Aviso: Gran volumen detectado. El cifrado se realizará en lotes transaccionales (Two-Phase Commit) para garantizar cero pérdida de datos.")
+                    : (Localization.CurrentLang == "EN"
+                        ? "🛡️ Maximum Security: Folder will be protected with military AES-256 CTR encryption and authenticated integrity."
+                        : "🛡️ Máxima Seguridad: La carpeta será protegida con cifrado militar AES-256 CTR e integridad autenticada."),
+                Font = new Font("Segoe UI", 8.5f),
+                ForeColor = esVolumenGrande ? Color.FromArgb(254, 202, 202) : Color.FromArgb(167, 243, 208),
+                Location = new Point(16, 10),
+                Size = new Size(450, bannerH - 20),
+                BackColor = Color.Transparent
+            };
+            pnlBanner.Controls.Add(lblBannerText);
+            form.Controls.Add(pnlBanner);
+
+            // 4. Pregunta
+            int promptY = bannerY + bannerH + 12;
+            var lblPrompt = new Label
+            {
+                Text = Localization.CurrentLang == "EN" ? "Do you want to proceed with encryption?" : "¿Deseas iniciar la encriptación ahora?",
+                Font = new Font("Segoe UI Semibold", 9.5f),
+                ForeColor = Color.FromArgb(240, 240, 240),
+                Location = new Point(25, promptY),
+                Size = new Size(480, 22),
+                TextAlign = ContentAlignment.MiddleCenter,
+                BackColor = Color.Transparent
+            };
+            form.Controls.Add(lblPrompt);
+
+            // 5. Botones de acción
+            int btnY = promptY + 30;
+            var btnSi = new Button
+            {
+                Text = Localization.CurrentLang == "EN" ? "🔒 PROCEED ENCRYPTION" : "🔒 INICIAR CIFRADO",
+                Location = new Point(25, btnY),
+                Size = new Size(250, 45),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Theme.AccentRed,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                DialogResult = DialogResult.Yes
+            };
+            btnSi.FlatAppearance.BorderSize = 0;
+            btnSi.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 38, 38);
+
+            var btnNo = new Button
+            {
+                Text = Localization.CurrentLang == "EN" ? "CANCEL" : "CANCELAR",
+                Location = new Point(285, btnY),
+                Size = new Size(220, 45),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(48, 42, 42),
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                DialogResult = DialogResult.No
+            };
+            btnNo.FlatAppearance.BorderSize = 0;
+            btnNo.FlatAppearance.MouseOverBackColor = Color.FromArgb(64, 56, 56);
+
+            form.Controls.AddRange(new Control[] { btnSi, btnNo });
+
+            // Keyboard support
+            form.AcceptButton = btnSi;
+            form.CancelButton = btnNo;
+            form.ActiveControl = btnNo;
+
+            // Centrado sobre el propietario
+            if (owner != null)
+            {
+                form.StartPosition = FormStartPosition.CenterParent;
+                return form.ShowDialog(owner);
+            }
+
+            return form.ShowDialog();
+        }
+
         // 3. ENTRADA DE DATOS (Enter en TextBox envía, Esc cancela)
         public static string ShowInput(string mensaje, string titulo = "Input", bool esPassword = false)
         {

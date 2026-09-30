@@ -556,7 +556,7 @@ namespace FolderLocker
 
         private void CentrarPanelConTabs(int pW, int pH)
         {
-            int gapHeader = 100;
+            int gapHeader = 105;
             Panel? activeCard = null;
             if (_protegerView != null && _protegerView.Visible) activeCard = _protegerView.CardPanel;
             else if (_restaurarView != null && _restaurarView.Visible) activeCard = _restaurarView.CardPanel;
@@ -564,19 +564,20 @@ namespace FolderLocker
             if (activeCard != null)
             {
                 int totalH = gapHeader + activeCard.Height;
-                int startY = Math.Max(30, (pH - totalH) / 2);
+                int startY = Math.Max(25, (pH - totalH) / 2);
                 int xCard = Math.Max(20, (pW - activeCard.Width) / 2);
 
                 activeCard.Location = new Point(xCard, startY + gapHeader);
 
                 if (lblBienvenido != null) lblBienvenido.Location = new Point(xCard, startY);
-                if (btnProteger != null) btnProteger.Location = new Point(xCard, startY + 45);
-                if (btnDejarDeProteger != null) btnDejarDeProteger.Location = new Point(xCard + 150, startY + 45);
+                if (btnProteger != null) btnProteger.Location = new Point(xCard, startY + 48);
+                if (btnProteger != null && btnDejarDeProteger != null) btnDejarDeProteger.Location = new Point(xCard + btnProteger.Width + 10, startY + 48);
 
                 if (separatorLine != null && btnProteger != null && btnDejarDeProteger != null)
                 {
                     int xSep = (_protegerView != null && _protegerView.Visible) ? btnProteger.Location.X : btnDejarDeProteger.Location.X;
-                    separatorLine.Location = new Point(xSep, startY + 90);
+                    separatorLine.Location = new Point(xSep, startY + 48 + btnProteger.Height);
+                    separatorLine.Width = (_protegerView != null && _protegerView.Visible) ? btnProteger.Width : btnDejarDeProteger.Width;
                 }
             }
         }
@@ -692,22 +693,22 @@ namespace FolderLocker
         {
             lblBienvenido.Parent = panel1;
             lblBienvenido.ForeColor = cTextPrimary;
-            lblBienvenido.Font = new Font("Segoe UI Light", 22);
+            lblBienvenido.Font = new Font("Segoe UI Semibold", 20, FontStyle.Bold);
             lblBienvenido.Text = Localization.Get("title_main");
             lblBienvenido.AutoSize = true;
             lblBienvenido.BringToFront();
 
             btnProteger.Parent = panel1;
-            btnProteger.Size = new Size(140, 50);
+            btnProteger.Size = new Size(160, 42);
             EstilarBotonTab(btnProteger, true);
             btnProteger.BringToFront();
 
             btnDejarDeProteger.Parent = panel1;
-            btnDejarDeProteger.Size = new Size(160, 50);
+            btnDejarDeProteger.Size = new Size(190, 42);
             EstilarBotonTab(btnDejarDeProteger, false);
             btnDejarDeProteger.BringToFront();
 
-            separatorLine = new Panel { Height = 3, BackColor = cAccentRed, Width = 140 };
+            separatorLine = new Panel { Height = 3, BackColor = cAccentRed, Width = 160 };
             panel1.Controls.Add(separatorLine);
             separatorLine.BringToFront();
         }
@@ -1033,17 +1034,17 @@ namespace FolderLocker
         {
             if (btnProteger != null)
             {
-                btnProteger.BackColor = protegerActivo ? cAccentRed : cSurface;
+                btnProteger.BackColor = protegerActivo ? Color.FromArgb(52, 24, 24) : Color.FromArgb(28, 26, 26);
                 btnProteger.ForeColor = protegerActivo ? Color.White : cTextSecondary;
             }
             if (btnDejarDeProteger != null)
             {
-                btnDejarDeProteger.BackColor = !protegerActivo ? cAccentRed : cSurface;
+                btnDejarDeProteger.BackColor = !protegerActivo ? Color.FromArgb(52, 24, 24) : Color.FromArgb(28, 26, 26);
                 btnDejarDeProteger.ForeColor = !protegerActivo ? Color.White : cTextSecondary;
             }
             if (separatorLine != null && btnProteger != null && btnDejarDeProteger != null)
             {
-                separatorLine.Location = new Point(protegerActivo ? btnProteger.Location.X : btnDejarDeProteger.Location.X, separatorLine.Location.Y);
+                separatorLine.Location = new Point(protegerActivo ? btnProteger.Location.X : btnDejarDeProteger.Location.X, btnProteger.Location.Y + btnProteger.Height);
                 separatorLine.Width = protegerActivo ? btnProteger.Width : btnDejarDeProteger.Width;
             }
         }
@@ -1068,9 +1069,9 @@ namespace FolderLocker
             if (b == null) return;
             b.FlatStyle = FlatStyle.Flat;
             b.FlatAppearance.BorderSize = 0;
-            b.BackColor = esPrincipal ? Color.FromArgb(60, 30, 30) : cSurface;
-            b.ForeColor = cTextPrimary;
-            b.Font = new Font("Segoe UI", 9, FontStyle.Bold);
+            b.BackColor = esPrincipal ? Color.FromArgb(52, 24, 24) : Color.FromArgb(28, 26, 26);
+            b.ForeColor = esPrincipal ? Color.White : cTextSecondary;
+            b.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
             b.Cursor = Cursors.Hand;
         }
 
