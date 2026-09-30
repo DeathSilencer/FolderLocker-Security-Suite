@@ -5,6 +5,8 @@
 ## Ignorar resultados de compilación (Binarios)
 [Bb]in/
 [Oo]bj/
+**/[Bb]in/
+**/[Oo]bj/
 
 ## Ignorar archivos de usuario y temporales
 *.user

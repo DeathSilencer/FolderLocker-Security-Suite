@@ -228,6 +228,33 @@ namespace FolderLocker
             }
         }
 
+        public void UpdateDirectoryPath(string oldRelativePath, string newRelativePath)
+        {
+            if (string.IsNullOrEmpty(oldRelativePath) || string.IsNullOrEmpty(newRelativePath)) return;
+            string oldPrefix = oldRelativePath.Replace('/', '\\').TrimEnd('\\') + "\\";
+            string newPrefix = newRelativePath.Replace('/', '\\').TrimEnd('\\') + "\\";
+            string oldExact = oldRelativePath.Replace('/', '\\').TrimEnd('\\');
+            string newExact = newRelativePath.Replace('/', '\\').TrimEnd('\\');
+
+            lock (_syncLock)
+            {
+                foreach (var e in _entries)
+                {
+                    if (string.IsNullOrEmpty(e.RelativePath)) continue;
+                    string norm = e.RelativePath.Replace('/', '\\');
+                    if (norm.Equals(oldExact, StringComparison.OrdinalIgnoreCase))
+                    {
+                        e.RelativePath = newExact;
+                    }
+                    else if (norm.StartsWith(oldPrefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        e.RelativePath = newPrefix + norm.Substring(oldPrefix.Length);
+                    }
+                }
+                if (_autoSave) GuardarIndice();
+            }
+        }
+
         public void RemoveEntry(string realName)
         {
             lock (_syncLock)

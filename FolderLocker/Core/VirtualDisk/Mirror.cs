@@ -65,13 +65,20 @@ namespace FolderLocker
             var item = (FileSystemInfo)new FileInfo(pathFisico);
             if (!File.Exists(pathFisico)) item = new DirectoryInfo(pathFisico);
 
-            bool isDir = (item.Attributes & FileAttributes.Directory) != 0;
+            var entry = _map.GetByPhysicalName(item.Name);
+            bool isDir = (item.Attributes & FileAttributes.Directory) != 0 || (entry != null && entry.IsDirectory);
+
             DateTime fechaFalsa = ObtenerFechaConsistente(item.Name);
+            string displayName = Path.GetFileName(fileName);
+            if (string.IsNullOrEmpty(displayName)) displayName = fileName;
+
+            var attributes = item.Attributes & ~FileAttributes.Hidden & ~FileAttributes.System;
+            if (isDir) attributes |= FileAttributes.Directory;
 
             fileInfo = new FileInformation
             {
-                FileName = fileName,
-                Attributes = item.Attributes & ~FileAttributes.Hidden & ~FileAttributes.System,
+                FileName = displayName,
+                Attributes = attributes,
                 Length = isDir ? 0 : ((FileInfo)item).Length,
                 CreationTime = fechaFalsa,
                 LastWriteTime = fechaFalsa, // Fecha consistente para la miniatura
@@ -99,21 +106,45 @@ namespace FolderLocker
                     var entry = _map.GetByPhysicalName(item.Name);
                     if (entry != null) nombreLogico = entry.RealName;
 
+                    bool isDir = (item.Attributes & FileAttributes.Directory) != 0 || (entry != null && entry.IsDirectory);
+                    var attributes = item.Attributes & ~FileAttributes.Hidden & ~FileAttributes.System;
+                    if (isDir) attributes |= FileAttributes.Directory;
+
                     DateTime fechaFalsa = ObtenerFechaConsistente(item.Name);
 
                     files.Add(new FileInformation
                     {
                         FileName = nombreLogico,
-                        Attributes = item.Attributes & ~FileAttributes.Hidden & ~FileAttributes.System,
+                        Attributes = attributes,
                         CreationTime = fechaFalsa,
                         LastAccessTime = DateTime.Now,
                         LastWriteTime = fechaFalsa, // Debe coincidir con GetFileInformation
-                        Length = (item is FileInfo f) ? f.Length : 0
+                        Length = isDir ? 0 : ((item is FileInfo f) ? f.Length : 0)
                     });
                 }
                 return DokanResult.Success;
             }
             catch { return DokanResult.AccessDenied; }
+        }
+
+        public NtStatus FindFilesWithPattern(string fileName, string searchPattern, out IList<FileInformation> files, IDokanFileInfo info)
+        {
+            files = new List<FileInformation>();
+            var status = FindFiles(fileName, out var allFiles, info);
+            if (status != DokanResult.Success)
+                return status;
+
+            if (string.IsNullOrEmpty(searchPattern) || searchPattern == "*")
+            {
+                files = allFiles;
+                return DokanResult.Success;
+            }
+
+            files = allFiles
+                .Where(f => DokanHelper.DokanIsNameInExpression(searchPattern, f.FileName, true))
+                .ToList();
+
+            return DokanResult.Success;
         }
 
         #endregion
@@ -135,7 +166,7 @@ namespace FolderLocker
                 if (pathPadreFisico == null) return DokanResult.PathNotFound;
 
                 bool esCarpeta = info.IsDirectory || (attributes & FileAttributes.Directory) != 0;
-                var entry = _map.AddEntry(nombreLogico, esCarpeta, fileName.TrimStart('\\')); // Genera GUID nuevo y registra ruta relativa
+                var entry = _map.AddEntry(nombreLogico, esCarpeta, fileName.TrimStart('\\', '/')); // Genera GUID nuevo y registra ruta relativa
                 pathReal = Path.Combine(pathPadreFisico, entry.PhysicalName);
             }
 
@@ -149,7 +180,10 @@ namespace FolderLocker
             {
                 if (mode == FileMode.CreateNew && exists) return DokanResult.FileExists;
                 if (mode == FileMode.Open && !exists) return DokanResult.PathNotFound;
-                if (mode == FileMode.CreateNew) Directory.CreateDirectory(pathReal);
+                if (mode == FileMode.CreateNew || (mode == FileMode.OpenOrCreate && !exists))
+                {
+                    Directory.CreateDirectory(pathReal);
+                }
 
                 info.Context = pathReal; // Guardamos contexto
                 return DokanResult.Success;
@@ -157,16 +191,30 @@ namespace FolderLocker
 
             // Manejo de Archivos
             if (mode == FileMode.Open && !exists) return DokanResult.FileNotFound;
-            if (mode == FileMode.CreateNew && exists) return DokanResult.FileExists;
 
             try
             {
-                // Abrimos el stream solo para verificar acceso/crear
-                using (var fs = new FileStream(pathReal, mode, System.IO.FileAccess.ReadWrite, share, 4096, options)) { }
+                if (!exists)
+                {
+                    if (mode == FileMode.Create || mode == FileMode.CreateNew || mode == FileMode.OpenOrCreate)
+                    {
+                        using (var fs = new FileStream(pathReal, FileMode.CreateNew, System.IO.FileAccess.ReadWrite, FileShare.ReadWrite)) { }
+                    }
+                    else
+                    {
+                        return DokanResult.FileNotFound;
+                    }
+                }
+                else
+                {
+                    if (mode == FileMode.CreateNew) return DokanResult.FileExists;
+                    if (mode == FileMode.Truncate || mode == FileMode.Create)
+                    {
+                        using (var fs = new FileStream(pathReal, FileMode.Truncate, System.IO.FileAccess.ReadWrite, FileShare.ReadWrite)) { }
+                    }
+                }
 
-                // *** IMPORTANTE ***
-                // Guardamos la ruta física en el Contexto. Esto soluciona el bug de "Abrir foto incorrecta".
-                // Windows sabrá que este Handle específico apunta a ESTE archivo físico.
+                // Guardamos la ruta física en el Contexto.
                 info.Context = pathReal;
 
                 return DokanResult.Success;
@@ -177,6 +225,33 @@ namespace FolderLocker
 
         public void Cleanup(string fileName, IDokanFileInfo info)
         {
+            string path = (info.Context as string) ?? ResolverRutaFisica(fileName);
+            if (info.DeletePending && path != null)
+            {
+                try
+                {
+                    if (info.IsDirectory)
+                    {
+                        if (Directory.Exists(path))
+                        {
+                            Directory.Delete(path, true);
+                            var entry = _map.GetByPhysicalName(Path.GetFileName(path));
+                            if (entry != null) _map.RemoveEntryByPhysical(entry.PhysicalName);
+                            _map.RemoveEntriesUnderDirectory(fileName.TrimStart('\\', '/'));
+                        }
+                    }
+                    else
+                    {
+                        if (File.Exists(path))
+                        {
+                            File.Delete(path);
+                            var entry = _map.GetByPhysicalName(Path.GetFileName(path));
+                            if (entry != null) _map.RemoveEntryByPhysical(entry.PhysicalName);
+                        }
+                    }
+                }
+                catch { }
+            }
             info.Context = null;
         }
 
@@ -235,7 +310,7 @@ namespace FolderLocker
         public NtStatus MoveFile(string oldName, string newName, bool replace, IDokanFileInfo info)
         {
             // 1. Resolver ruta de origen (El archivo que queremos mover/renombrar)
-            string sourcePath = ResolverRutaFisica(oldName);
+            string sourcePath = (info.Context as string) ?? ResolverRutaFisica(oldName);
             if (sourcePath == null || (!File.Exists(sourcePath) && !Directory.Exists(sourcePath)))
                 return DokanResult.FileNotFound;
 
@@ -292,11 +367,19 @@ namespace FolderLocker
                 }
 
                 // 5. Actualizar el Mapa (Renombrado Lógico y ruta relativa)
-                // Aquí es donde realmente cambia el nombre visible para el usuario
+                string oldRel = oldName.TrimStart('\\', '/');
+                string newRel = newName.TrimStart('\\', '/');
+
                 entry.RealName = newLogicalName;
-                entry.RelativePath = newName.TrimStart('\\');
+                entry.RelativePath = newRel;
+
+                if (entry.IsDirectory)
+                {
+                    _map.UpdateDirectoryPath(oldRel, newRel);
+                }
                 _map.GuardarIndice();
 
+                info.Context = destPath;
                 return DokanResult.Success;
             }
             catch (IOException)
@@ -316,9 +399,11 @@ namespace FolderLocker
 
         private string ResolverRutaFisica(string fileName)
         {
-            string rutaLogica = fileName.TrimStart('\\');
+            if (string.IsNullOrEmpty(fileName)) return _path;
+            string rutaLogica = fileName.TrimStart('\\', '/');
             if (string.IsNullOrEmpty(rutaLogica)) return _path;
-            string[] partes = rutaLogica.Split(Path.DirectorySeparatorChar);
+
+            string[] partes = rutaLogica.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
             string rutaActual = _path;
 
             foreach (var parte in partes)
@@ -328,7 +413,9 @@ namespace FolderLocker
                 bool encontrado = false;
                 foreach (var item in new DirectoryInfo(rutaActual).GetFileSystemInfos())
                 {
-                    if (item.Name == "dir.idx" || item.Name == "locker.id") continue;
+                    if (item.Name.Equals("dir.idx", StringComparison.OrdinalIgnoreCase) ||
+                        item.Name.Equals("locker.id", StringComparison.OrdinalIgnoreCase)) continue;
+
                     var entry = _map.GetByPhysicalName(item.Name);
 
                     if ((entry != null && entry.RealName.Equals(parte, StringComparison.OrdinalIgnoreCase)) ||
@@ -346,31 +433,33 @@ namespace FolderLocker
 
         public NtStatus DeleteFile(string fileName, IDokanFileInfo info)
         {
-            string path = ResolverRutaFisica(fileName);
-            if (!File.Exists(path)) return DokanResult.FileNotFound;
-            try
-            {
-                File.Delete(path);
-                var entry = _map.GetByPhysicalName(Path.GetFileName(path));
-                if (entry != null) _map.RemoveEntryByPhysical(entry.PhysicalName);
-                return DokanResult.Success;
-            }
-            catch { return DokanResult.AccessDenied; }
+            string path = (info.Context as string) ?? ResolverRutaFisica(fileName);
+            if (path == null || !File.Exists(path)) return DokanResult.FileNotFound;
+            return DokanResult.Success;
         }
 
         public NtStatus DeleteDirectory(string fileName, IDokanFileInfo info)
         {
-            string path = ResolverRutaFisica(fileName);
-            if (!Directory.Exists(path)) return DokanResult.PathNotFound;
+            string path = (info.Context as string) ?? ResolverRutaFisica(fileName);
+            if (path == null || !Directory.Exists(path)) return DokanResult.PathNotFound;
+
             try
             {
-                Directory.Delete(path, true);
-                var entry = _map.GetByPhysicalName(Path.GetFileName(path));
-                if (entry != null) _map.RemoveEntryByPhysical(entry.PhysicalName);
-                _map.RemoveEntriesUnderDirectory(fileName.TrimStart('\\'));
-                return DokanResult.Success;
+                bool hasFiles = Directory.EnumerateFileSystemEntries(path).Any(p =>
+                {
+                    string name = Path.GetFileName(p);
+                    return !name.Equals("dir.idx", StringComparison.OrdinalIgnoreCase) &&
+                           !name.Equals("locker.id", StringComparison.OrdinalIgnoreCase);
+                });
+
+                if (hasFiles) return DokanResult.DirectoryNotEmpty;
             }
-            catch { return DokanResult.AccessDenied; }
+            catch
+            {
+                return DokanResult.AccessDenied;
+            }
+
+            return DokanResult.Success;
         }
 
         public NtStatus GetVolumeInformation(out string label, out FileSystemFeatures features, out string name, out uint serialNumber, IDokanFileInfo info)
@@ -382,9 +471,24 @@ namespace FolderLocker
             return DokanResult.Success;
         }
 
-        // Boilerplate
-        public NtStatus SetAllocationSize(string f, long l, IDokanFileInfo i) => DokanResult.Success;
-        public NtStatus SetEndOfFile(string f, long l, IDokanFileInfo i) => DokanResult.Success;
+        public NtStatus SetAllocationSize(string fileName, long length, IDokanFileInfo info)
+        {
+            return SetEndOfFile(fileName, length, info);
+        }
+
+        public NtStatus SetEndOfFile(string fileName, long length, IDokanFileInfo info)
+        {
+            string path = (info.Context as string) ?? ResolverRutaFisica(fileName);
+            if (path == null || !File.Exists(path)) return DokanResult.FileNotFound;
+            try
+            {
+                using var stream = new FileStream(path, FileMode.Open, System.IO.FileAccess.Write, FileShare.ReadWrite);
+                stream.SetLength(length);
+                return DokanResult.Success;
+            }
+            catch { return DokanResult.Unsuccessful; }
+        }
+
         public NtStatus SetFileAttributes(string f, FileAttributes a, IDokanFileInfo i) => DokanResult.Success;
         public NtStatus SetFileTime(string f, DateTime? c, DateTime? a, DateTime? w, IDokanFileInfo i) => DokanResult.Success;
         public NtStatus GetFileSecurity(string f, out FileSystemSecurity s, AccessControlSections c, IDokanFileInfo i) { s = null; return DokanResult.NotImplemented; }
@@ -393,7 +497,6 @@ namespace FolderLocker
         public NtStatus Mounted(string m, IDokanFileInfo i) => DokanResult.Success;
         public NtStatus Unmounted(IDokanFileInfo i) => DokanResult.Success;
         public NtStatus FlushFileBuffers(string f, IDokanFileInfo i) => DokanResult.Success;
-        public NtStatus FindFilesWithPattern(string f, string s, out IList<FileInformation> fl, IDokanFileInfo i) => FindFiles(f, out fl, i);
         public NtStatus LockFile(string f, long o, long l, IDokanFileInfo i) => DokanResult.Success;
         public NtStatus UnlockFile(string f, long o, long l, IDokanFileInfo i) => DokanResult.Success;
         public NtStatus FindStreams(string f, out IList<FileInformation> s, IDokanFileInfo i) { s = null; return DokanResult.NotImplemented; }
