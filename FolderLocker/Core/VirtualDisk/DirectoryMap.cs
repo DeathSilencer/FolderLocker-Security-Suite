@@ -41,29 +41,46 @@ namespace FolderLocker
             {
                 if (File.Exists(_indexPath))
                 {
+                    byte[] encryptedBytes = File.ReadAllBytes(_indexPath);
+                    byte[] copyBytes = (byte[])encryptedBytes.Clone();
+
+                    // INTENTO 1: Descifrar con el nuevo estándar AES-256 CTR
                     try
                     {
-                        byte[] encryptedBytes = File.ReadAllBytes(_indexPath);
-
-                        // Descifrar en memoria
-                        // Si la contraseña es incorrecta, esto generará "basura" binaria
+                        _crypto.IsLegacyMode = false;
                         _crypto.TransformarDatos(encryptedBytes, 0, encryptedBytes.Length);
 
                         string json = System.Text.Encoding.UTF8.GetString(encryptedBytes);
-
-                        // Intentamos deserializar. Si es basura binaria, esto fallará.
                         _entries = JsonSerializer.Deserialize<List<FileEntry>>(json);
 
-                        if (_entries == null) throw new Exception("El índice deserializado es nulo.");
+                        if (_entries != null) return;
                     }
-                    catch (Exception ex)
+                    catch
                     {
-                        // --- CORRECCIÓN CRÍTICA ---
-                        // Ya no "silenciamos" el error. Si el índice existe pero falla,
-                        // DEBEMOS avisar y detener todo.
-                        // Esto previene montar una bóveda "zombie" vacía.
-                        throw new Exception("¡FALLO DE SEGURIDAD! Contraseña incorrecta o índice corrupto. " + ex.Message);
+                        // Si falla con AES-256 CTR, probamos si es una bóveda creada con el método legacy XOR
                     }
+
+                    // INTENTO 2: Compatibilidad retroactiva con bóvedas previas (Legacy XOR)
+                    try
+                    {
+                        _crypto.IsLegacyMode = true;
+                        _crypto.TransformarDatos(copyBytes, 0, copyBytes.Length);
+
+                        string legacyJson = System.Text.Encoding.UTF8.GetString(copyBytes);
+                        _entries = JsonSerializer.Deserialize<List<FileEntry>>(legacyJson);
+
+                        if (_entries != null)
+                        {
+                            return; // Bóveda legacy detectada y cargada exitosamente
+                        }
+                    }
+                    catch
+                    {
+                        // Si ambos fallan, la contraseña es incorrecta o el archivo está dañado
+                    }
+
+                    _crypto.IsLegacyMode = false;
+                    throw new Exception("¡FALLO DE SEGURIDAD! Contraseña incorrecta o índice corrupto.");
                 }
                 else
                 {
