@@ -113,10 +113,12 @@ namespace FolderLocker
             int totalArchivos,
             string tamanoTexto,
             string tiempoEstimado,
-            bool esVolumenGrande)
+            bool esVolumenGrande,
+            int archivosJunkExcluidos = 0)
         {
+            int extraH = archivosJunkExcluidos > 0 ? 20 : 0;
             int w = 530;
-            int h = esVolumenGrande ? 465 : 445;
+            int h = (esVolumenGrande ? 465 : 445) + extraH;
             string titulo = esVolumenGrande
                 ? (Localization.CurrentLang == "EN" ? "⚠️ Warning: Large File Volume" : "⚠️ Advertencia: Gran Volumen")
                 : (Localization.CurrentLang == "EN" ? "🛡️ Security Summary" : "🛡️ Resumen de Seguridad");
@@ -268,7 +270,7 @@ namespace FolderLocker
 
             // 3. Banner de Seguridad o Advertencia
             int bannerY = 200;
-            int bannerH = esVolumenGrande ? 76 : 62;
+            int bannerH = (esVolumenGrande ? 76 : 62) + extraH;
             var pnlBanner = new Panel
             {
                 Location = new Point(25, bannerY),
@@ -283,15 +285,25 @@ namespace FolderLocker
                 e.Graphics.FillRectangle(b, 0, 0, 4, pnlBanner.Height);
             };
 
+            string textoBanner = esVolumenGrande
+                ? (Localization.CurrentLang == "EN"
+                    ? "⚠️ Notice: Large folder detected. The encryption process runs in transactional batches (Two-Phase Commit) to guarantee zero file loss."
+                    : "⚠️ Aviso: Gran volumen detectado. El cifrado se realizará en lotes transaccionales (Two-Phase Commit) para garantizar cero pérdida de datos.")
+                : (Localization.CurrentLang == "EN"
+                    ? "🛡️ Maximum Security: Folder will be protected with military AES-256 CTR encryption and authenticated integrity."
+                    : "🛡️ Máxima Seguridad: La carpeta será protegida con cifrado militar AES-256 CTR e integridad autenticada.");
+
+            if (archivosJunkExcluidos > 0)
+            {
+                string infoJunk = Localization.CurrentLang == "EN"
+                    ? $"\n🧹 Smart Filter: {archivosJunkExcluidos:N0} temporary/lock file(s) excluded (thumbs.db, .tmp, etc.)"
+                    : $"\n🧹 Filtro Inteligente: {archivosJunkExcluidos:N0} archivo(s) temporal(es) excluido(s) para prevenir bloqueos.";
+                textoBanner += infoJunk;
+            }
+
             var lblBannerText = new Label
             {
-                Text = esVolumenGrande
-                    ? (Localization.CurrentLang == "EN"
-                        ? "⚠️ Notice: Large folder detected. The encryption process runs in transactional batches (Two-Phase Commit) to guarantee zero file loss."
-                        : "⚠️ Aviso: Gran volumen detectado. El cifrado se realizará en lotes transaccionales (Two-Phase Commit) para garantizar cero pérdida de datos.")
-                    : (Localization.CurrentLang == "EN"
-                        ? "🛡️ Maximum Security: Folder will be protected with military AES-256 CTR encryption and authenticated integrity."
-                        : "🛡️ Máxima Seguridad: La carpeta será protegida con cifrado militar AES-256 CTR e integridad autenticada."),
+                Text = textoBanner,
                 Font = new Font("Segoe UI", 8.5f),
                 ForeColor = esVolumenGrande ? Color.FromArgb(254, 202, 202) : Color.FromArgb(167, 243, 208),
                 Location = new Point(16, 10),

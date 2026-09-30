@@ -7,6 +7,10 @@
 [Oo]bj/
 **/[Bb]in/
 **/[Oo]bj/
+publish/
+**/publish/
+installer/FolderLocker.exe
+installer/Output_Installer/
 
 ## Ignorar archivos de usuario y temporales
 *.user

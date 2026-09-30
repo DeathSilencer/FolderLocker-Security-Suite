@@ -1,7 +1,7 @@
 [Setup]
 ; --- INFORMACIÓN BÁSICA ---
 AppName=FolderLocker Security Suite
-AppVersion=5.0
+AppVersion=5.2
 AppPublisher=David Platas
 ; Directorio de instalación por defecto (Archivos de Programa)
 DefaultDirName={autopf}\FolderLocker Security Suite
@@ -11,7 +11,7 @@ PrivilegesRequired=admin
 Compression=lzma2
 SolidCompression=yes
 OutputDir=Output_Installer
-OutputBaseFilename=FolderLocker Setup v5.1
+OutputBaseFilename=FolderLocker Setup v5.2
 
 ; --- ICONO DEL INSTALADOR (Corregido según tu captura) ---
 SetupIconFile=Iconopredeterminado.ico
@@ -47,7 +47,7 @@ Source: "vcruntime140_1.dll"; DestDir: "{app}"; Flags: ignoreversion
 Filename: "{tmp}\DokanSetup.exe"; \
     Parameters: "/passive /norestart"; \
     Description: "Instalando controladores necesarios (Dokan)..."; \
-    Flags: waituntilterminated restartifneeded; \
+    Flags: waituntilterminated; \
     Check: NeedsDokan
 
 ; --- EJECUTAR AL FINALIZAR ---

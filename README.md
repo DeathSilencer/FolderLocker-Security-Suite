@@ -10,15 +10,16 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6.svg)](https://www.microsoft.com/)
 [![Framework](https://img.shields.io/badge/.NET-8.0-512BD4.svg)](https://dotnet.microsoft.com/)
 [![Driver](https://img.shields.io/badge/Dokan-v2.0.6-orange.svg)](https://dokan-dev.github.io/)
-[![Status](https://img.shields.io/badge/Estado-Estable%20v5.0-success.svg)]()
+[![Status](https://img.shields.io/badge/Estado-Estable%20v5.2-success.svg)]()
 [![Languages](https://img.shields.io/badge/Idiomas-ES_|_EN_|_PT_|_RU_|_CN-blueviolet)]()
 
 <br>
 
 | 🛡️ | **Estado** | **Descripción y Novedades** |
 | :---: | :--- | :--- |
-| **v5.1** | 🚀 **Nueva** | *Ahora con "Atomic Locking" (Blindaje contra Apagones).* <br> **¡Descarga la actualización abajo!** <br><br> <details><summary><strong>✨ Clic para ver Novedades v5.1</strong></summary><br>Esta actualización introduce un blindaje total contra fallos de energía:<br><br><b>🛡️ Protección "Atomic Locking"</b><ul><li><b>Cifrado a Prueba de Apagones:</b> Usa archivos temporales (.tmp). El original no se toca hasta que el nuevo es 100% seguro.</li><li><b>Auto-Limpieza:</b> Si se va la luz, al reiniciar, el sistema elimina los archivos corruptos automáticamente.</li><li><b>Filtro de Inocencia:</b> Evita dañar archivos sanos al desencriptar tras un fallo.</li></ul><b>🔧 Correcciones</b><ul><li>Solucionado conflicto de ambigüedad en <i>System.IO.FileAccess</i>.</li><li>Ventanas emergentes centradas (Sticky Popups) y notificaciones garantizadas.</li></ul></details> |
-| **v5.0** | ✅ **Estable** | *Arquitectura "Stealth" e Integración Nativa con Dokan Driver.* |
+| **v5.2** | 🚀 **Nueva** | *Actualización Integral de Seguridad y Arquitectura:* <br> • **Auto-Lock por Inactividad** (1 a 30 min + bloqueo de Windows Win+L). <br> • **Búsqueda en Tiempo Real** con atajos de teclado en "Abrir Bóveda". <br> • **Filtro Inteligente de Basura** (`thumbs.db`, temporales, locks de Office). <br> • **Pausar, Reanudar y Cancelar** cifrados gigantes con Two-Phase Commit. <br> • **Capa de Servicios Desacoplada y Auditoría Forense** (`security.log`). <br><br> <details><summary><strong>✨ Clic para ver Novedades v5.2</strong></summary><br><b>🛡️ Auto-Lock & Privacidad</b><ul><li><b>Inactividad Configurable:</b> Bloqueo automático de sesión tras 1 a 30 minutos sin actividad.</li><li><b>Detección de Bloqueo de Windows:</b> Desmontaje inmediato de unidades virtuales al bloquear el PC (Win + L).</li><li><b>Protección de Procesos:</b> Si hay un cifrado en curso, el bloqueo se pospone de forma segura hasta terminar.</li></ul><b>🔍 Buscador Reactivo</b><ul><li>Filtrado instantáneo insensible a mayúsculas por nombre o ruta.</li><li>Navegación fluida por teclado (↓ para navegar, Esc para limpiar, Enter para ir a contraseña).</li></ul><b>🧹 Limpieza & Control de Cifrado</b><ul><li>Exclusión proactiva de archivos temporales (`thumbs.db`, `desktop.ini`, `~$*.docx`, `.tmp`).</li><li>Botones de Pausa (0% CPU), Reanudar y Cancelar Atómico sin riesgo de corrupción.</li><li>Bitácora de auditoría segura (`security.log`) con rotación automática a 5 MB.</li><li>Capa de servicios desacoplada con 36 pruebas unitarias automatizadas (100% PASS).</li></ul></details> |
+| **v5.1** | ✅ **Estable** | *Ahora con "Atomic Locking" (Blindaje contra Apagones).* |
+| **v5.0** | 📦 **Legacy** | *Arquitectura "Stealth" e Integración Nativa con Dokan Driver.* |
 
 <br>
 </div>
@@ -171,6 +172,12 @@ Descarga el último archivo `installer.exe` directamente desde la página de lan
 
 ## `>_` Características
 
+- **Auto-Lock por Inactividad:** Cierre de sesión automático configurable (1 a 30 min) y desmontaje preventivo de unidades virtuales Dokan al alejarse del equipo o presionar `Win + L`.
+- **Búsqueda Predictiva en Tiempo Real:** Filtrado reactivo en "Abrir Bóveda" por nombre o ruta, con navegación ágil por teclado (`↓`, `Esc`, `Enter`) y contador dinámico de resultados.
+- **Filtro Inteligente de Basura:** Detección y omisión proactiva de archivos del sistema y temporales (`thumbs.db`, `desktop.ini`, `~$*.docx`, `.tmp`), con tarjeta de activación/desactivación en Configuración.
+- **Pausa, Reanudación y Cancelación Atómica:** Control total sobre operaciones pesadas de cifrado. Pausa con 0% de CPU y cancelación atómica que purga temporales sin riesgo de corrupción.
+- **Registro de Auditoría Forense (`security.log`):** Bitácora local de eventos de seguridad con rotación automática a 5 MB que registra accesos, montajes, bloqueos y modificaciones.
+- **Capa de Servicios Desacoplada:** Arquitectura modular (`IVaultService`, `IFolderProtectionService`, `IInactivityService`) respaldada por una suite de 36 pruebas unitarias automatizadas (100% PASS).
 - **Arquitectura "Stealth":** Los nombres de archivo se ofuscan en el disco físico (se convierten en GUIDs aleatorios).
 - **Encriptación On-The-Fly:** Los archivos se descifran en la memoria RAM solo cuando los solicitas. Nada se guarda en texto plano.
 - **Interfaz Moderna UI:** Diseño limpio "Red Security" inspirado en dashboards de ciberseguridad, sin bordes.
@@ -193,22 +200,27 @@ Descarga el último archivo `installer.exe` directamente desde la página de lan
 
 ## `>_` Arquitectura
 
-Este proyecto está construido utilizando tecnologías .NET de vanguardia:
+Este proyecto está construido utilizando tecnologías .NET de vanguardia y arquitectura desacoplada:
 
 | Componente | Stack Tecnológico | Descripción |
 | :--- | :--- | :--- |
 | **Core** | C# .NET 8.0 | Framework de escritorio de alto rendimiento. |
-| **Kernel** | DokanNet 2.0.6 | Wrapper para el driver de sistema de archivos en modo usuario. |
-| **Criptografía** | AES + SHA256 | Hashing con "Salt" y encriptación de flujo (Stream Cipher). |
+| **Kernel** | DokanNet 2.3.0 | Wrapper para el driver de sistema de archivos en modo usuario. |
+| **Criptografía** | AES-256 CTR + SHA256 | Hashing con "Salt" y cifrado de flujo seguro por bloques. |
+| **Protección Atómica** | Two-Phase Commit | Transaccionalidad a prueba de fallos de energía con saneamiento de temporales. |
+| **Seguridad Activa** | InactivityService | Monitoreo de inactividad por hardware (IMessageFilter) y bloqueo de Windows. |
+| **Auditoría** | SecurityAuditLogger | Registro rotativo a 5 MB para trazabilidad forense local. |
+| **Testing** | xUnit (.NET 8) | Suite de 36 pruebas unitarias automatizadas (100% PASS). |
 | **Datos** | JSON + Ofuscación | Almacenamiento local seguro para perfiles de usuario. |
 
 ---
 
 ## `>_` Instalación
 
-1.  Descarga `FolderLocker_Setup.exe`.
+1.  Descarga el instalador oficial `FolderLocker Setup v5.2.exe`.
 2.  Ejecuta el instalador.
-    * *Nota:* El instalador detectará automáticamente si necesitas el **Driver Dokan**. Si te falta, lo instalará por ti silenciosamente.
+    * *Detección Inteligente:* El instalador detectará automáticamente si necesitas el **Driver Dokan**. Si te falta, lo instalará silenciosamente.
+    * *Desinstalación Limpia:* Incluye desinstalador completo con acceso directo en el Menú Inicio y registrado en *Configuración de Windows > Aplicaciones instaladas*.
 3.  Reinicia tu PC (si se instalaron los drivers por primera vez).
 4.  Inicia **FolderLocker** desde tu escritorio.
 

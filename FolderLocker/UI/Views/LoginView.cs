@@ -11,6 +11,8 @@ namespace FolderLocker.UI.Views
 
         private Label lblLoginTitle = null!;
         private Label lblLoginSub = null!;
+        private Panel pnlAutoLockNotice = null!;
+        private Label lblAutoLockNotice = null!;
         private Label lblLoginUser = null!;
         private Label lblLoginPass = null!;
         private TextBox txtUser = null!;
@@ -80,11 +82,36 @@ namespace FolderLocker.UI.Views
             };
             cardLogin.Controls.Add(lblLoginSub);
 
+            pnlAutoLockNotice = new Panel
+            {
+                Location = new Point(50, 115),
+                Size = new Size(350, 22),
+                BackColor = Color.FromArgb(50, 22, 22),
+                Visible = false
+            };
+            pnlAutoLockNotice.Paint += (s, e) =>
+            {
+                ControlPaint.DrawBorder(e.Graphics, pnlAutoLockNotice.ClientRectangle, UITheme.cAccentRed, ButtonBorderStyle.Solid);
+            };
+
+            lblAutoLockNotice = new Label
+            {
+                Dock = DockStyle.Fill,
+                Text = Localization.Get("msg_autolock_triggered") ?? "🔒 Sesión bloqueada por inactividad",
+                ForeColor = Color.FromArgb(254, 202, 202),
+                Font = new Font("Segoe UI", 8f, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            pnlAutoLockNotice.Controls.Add(lblAutoLockNotice);
+            cardLogin.Controls.Add(pnlAutoLockNotice);
+
             lblLoginUser = UITheme.CrearEtiqueta(cardLogin, Localization.Get("login_lbl_user"), 50, 140);
             txtUser = UITheme.CrearInput(cardLogin, 50, 165, 350);
+            txtUser.TextChanged += (s, e) => OcultarNoticiaAutoLock();
 
             lblLoginPass = UITheme.CrearEtiqueta(cardLogin, Localization.Get("login_lbl_pass"), 50, 210);
             txtPass = UITheme.CrearInputPassword(cardLogin, 50, 235, 350);
+            txtPass.TextChanged += (s, e) => OcultarNoticiaAutoLock();
 
             KeyEventHandler enterHandler = (s, e) =>
             {
@@ -258,6 +285,30 @@ namespace FolderLocker.UI.Views
             btnLoginForgot.Text = Localization.Get("link_forgot");
             btnLoginEnter.Text = Localization.Get("login_btn_enter");
             btnLoginReg.Text = Localization.Get("login_btn_reg");
+            if (lblAutoLockNotice != null)
+            {
+                lblAutoLockNotice.Text = Localization.Get("msg_autolock_triggered") ?? "🔒 Sesión bloqueada por inactividad";
+            }
+        }
+
+        public void MostrarNoticiaAutoLock(string? mensaje = null)
+        {
+            if (lblAutoLockNotice != null)
+            {
+                lblAutoLockNotice.Text = mensaje ?? (Localization.Get("msg_autolock_triggered") ?? "🔒 Sesión bloqueada por inactividad");
+            }
+            if (pnlAutoLockNotice != null)
+            {
+                pnlAutoLockNotice.Visible = true;
+            }
+        }
+
+        public void OcultarNoticiaAutoLock()
+        {
+            if (pnlAutoLockNotice != null)
+            {
+                pnlAutoLockNotice.Visible = false;
+            }
         }
 
         public void LimpiarPassword()
