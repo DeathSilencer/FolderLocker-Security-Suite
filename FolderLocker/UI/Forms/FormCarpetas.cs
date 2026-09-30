@@ -543,6 +543,8 @@ namespace FolderLocker
                     }
                     if (nombreLow == "locker.id" || nombreLow == "dir.idx") continue;
 
+                    string rutaRelativa = Path.GetRelativePath(rutaBase, archivoPath);
+
                     try
                     {
                         FileEntry entry = null;
@@ -553,8 +555,9 @@ namespace FolderLocker
                             entry = mapa.GetByPhysicalName(nombreArchivoFisico);
                             if (entry != null) { bytesProcesadosTotal += new FileInfo(archivoPath).Length; continue; }
 
-                            entry = mapa.GetByRealName(nombreArchivoFisico);
-                            if (entry == null) entry = mapa.AddEntry(nombreArchivoFisico, false);
+                            // Búsqueda por ruta relativa única para evitar colisiones con archivos del mismo nombre en otras subcarpetas
+                            entry = mapa.GetByRelativePath(rutaRelativa);
+                            if (entry == null) entry = mapa.AddEntry(nombreArchivoFisico, false, rutaRelativa);
                         }
                         else
                         {
@@ -644,7 +647,7 @@ namespace FolderLocker
 
                         // 5. Actualizamos Mapa
                         if (esEncriptar) mapa.GuardarIndice();
-                        else if (!esEncriptar && entry != null) mapa.RemoveEntry(entry.RealName);
+                        else if (!esEncriptar && entry != null) mapa.RemoveEntryByPhysical(entry.PhysicalName);
 
                     }
                     catch (Exception ex)

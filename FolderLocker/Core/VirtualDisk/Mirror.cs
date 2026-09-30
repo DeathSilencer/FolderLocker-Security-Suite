@@ -1,4 +1,4 @@
-﻿using DokanNet;
+using DokanNet;
 using System.Security.AccessControl;
 using System.Text;
 // Alias para evitar conflictos con System.IO.FileAccess
@@ -135,7 +135,7 @@ namespace FolderLocker
                 if (pathPadreFisico == null) return DokanResult.PathNotFound;
 
                 bool esCarpeta = info.IsDirectory || (attributes & FileAttributes.Directory) != 0;
-                var entry = _map.AddEntry(nombreLogico, esCarpeta); // Genera GUID nuevo
+                var entry = _map.AddEntry(nombreLogico, esCarpeta, fileName.TrimStart('\\')); // Genera GUID nuevo y registra ruta relativa
                 pathReal = Path.Combine(pathPadreFisico, entry.PhysicalName);
             }
 
@@ -274,9 +274,9 @@ namespace FolderLocker
                     // Hay que borrar el archivo "victima" que está ocupando el nombre
                     string nombreFisicoVictima = Path.GetFileName(destCheck);
 
-                    // Borrar del mapa
+                    // Borrar del mapa por nombre físico único
                     var entryVictima = _map.GetByPhysicalName(nombreFisicoVictima);
-                    if (entryVictima != null) _map.RemoveEntry(entryVictima.RealName);
+                    if (entryVictima != null) _map.RemoveEntryByPhysical(entryVictima.PhysicalName);
 
                     // Borrar del disco físico
                     if (Directory.Exists(destCheck)) Directory.Delete(destCheck, true);
@@ -291,9 +291,10 @@ namespace FolderLocker
                     else File.Move(sourcePath, destPath);
                 }
 
-                // 5. Actualizar el Mapa (Renombrado Lógico)
+                // 5. Actualizar el Mapa (Renombrado Lógico y ruta relativa)
                 // Aquí es donde realmente cambia el nombre visible para el usuario
                 entry.RealName = newLogicalName;
+                entry.RelativePath = newName.TrimStart('\\');
                 _map.GuardarIndice();
 
                 return DokanResult.Success;
@@ -351,7 +352,7 @@ namespace FolderLocker
             {
                 File.Delete(path);
                 var entry = _map.GetByPhysicalName(Path.GetFileName(path));
-                if (entry != null) _map.RemoveEntry(entry.RealName);
+                if (entry != null) _map.RemoveEntryByPhysical(entry.PhysicalName);
                 return DokanResult.Success;
             }
             catch { return DokanResult.AccessDenied; }
@@ -365,7 +366,8 @@ namespace FolderLocker
             {
                 Directory.Delete(path, true);
                 var entry = _map.GetByPhysicalName(Path.GetFileName(path));
-                if (entry != null) _map.RemoveEntry(entry.RealName);
+                if (entry != null) _map.RemoveEntryByPhysical(entry.PhysicalName);
+                _map.RemoveEntriesUnderDirectory(fileName.TrimStart('\\'));
                 return DokanResult.Success;
             }
             catch { return DokanResult.AccessDenied; }

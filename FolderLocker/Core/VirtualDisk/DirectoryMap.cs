@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 
 namespace FolderLocker
 {
@@ -6,6 +6,7 @@ namespace FolderLocker
     {
         public string RealName { get; set; } = string.Empty;
         public string PhysicalName { get; set; } = string.Empty;
+        public string RelativePath { get; set; } = string.Empty;
         public bool IsDirectory { get; set; }
         public DateTime CreationTime { get; set; } = DateTime.Now;
     }
@@ -126,6 +127,18 @@ namespace FolderLocker
             }
         }
 
+        public FileEntry GetByRelativePath(string relativePath)
+        {
+            if (string.IsNullOrEmpty(relativePath)) return null;
+            string normalized = relativePath.Replace('/', '\\').TrimStart('\\');
+            lock (_syncLock)
+            {
+                return _entries.FirstOrDefault(e =>
+                    !string.IsNullOrEmpty(e.RelativePath) &&
+                    e.RelativePath.Replace('/', '\\').TrimStart('\\').Equals(normalized, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+
         public FileEntry GetByPhysicalName(string name)
         {
             lock (_syncLock)
@@ -134,7 +147,7 @@ namespace FolderLocker
             }
         }
 
-        public FileEntry AddEntry(string realName, bool isDir)
+        public FileEntry AddEntry(string realName, bool isDir, string relativePath = "")
         {
             lock (_syncLock)
             {
@@ -143,12 +156,17 @@ namespace FolderLocker
                 {
                     newPhysical = Guid.NewGuid().ToString("N").Substring(0, 12) + ".lock";
                 }
-                while (_entries.Any(e => e.PhysicalName == newPhysical));
+                while (_entries.Any(e => e.PhysicalName.Equals(newPhysical, StringComparison.OrdinalIgnoreCase)));
+
+                string normalizedRelPath = string.IsNullOrEmpty(relativePath)
+                    ? realName
+                    : relativePath.Replace('/', '\\').TrimStart('\\');
 
                 var newEntry = new FileEntry
                 {
                     RealName = realName,
                     PhysicalName = newPhysical,
+                    RelativePath = normalizedRelPath,
                     IsDirectory = isDir,
                     CreationTime = DateTime.Now
                 };
@@ -158,6 +176,38 @@ namespace FolderLocker
                 if (_autoSave) GuardarIndice();
 
                 return newEntry;
+            }
+        }
+
+        public void RemoveEntryByPhysical(string physicalName)
+        {
+            if (string.IsNullOrEmpty(physicalName)) return;
+            lock (_syncLock)
+            {
+                var entry = _entries.FirstOrDefault(e => e.PhysicalName.Equals(physicalName, StringComparison.OrdinalIgnoreCase));
+                if (entry != null)
+                {
+                    _entries.Remove(entry);
+                    if (_autoSave) GuardarIndice();
+                }
+            }
+        }
+
+        public void RemoveEntriesUnderDirectory(string relativeDirPath)
+        {
+            if (string.IsNullOrEmpty(relativeDirPath)) return;
+            string prefix = relativeDirPath.Replace('/', '\\').TrimEnd('\\') + "\\";
+            string dirExact = relativeDirPath.Replace('/', '\\').TrimEnd('\\');
+            lock (_syncLock)
+            {
+                _entries.RemoveAll(e =>
+                {
+                    if (string.IsNullOrEmpty(e.RelativePath)) return false;
+                    string norm = e.RelativePath.Replace('/', '\\');
+                    return norm.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ||
+                           norm.Equals(dirExact, StringComparison.OrdinalIgnoreCase);
+                });
+                if (_autoSave) GuardarIndice();
             }
         }
 
