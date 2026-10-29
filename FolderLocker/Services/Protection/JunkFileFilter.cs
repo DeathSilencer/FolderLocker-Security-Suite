@@ -24,7 +24,10 @@ namespace FolderLocker.Services.Protection
             "locker.id",
             "dir.idx",
             "dir.idx.bak",
-            "dir.idx.tmp"
+            "dir.idx.tmp",
+            "dir.journal",
+            "dir.journal.tmp",
+            ".fl_lock_state"
         };
 
         // 2. Extensiones de archivos temporales, swap o descargas incompletas
@@ -197,7 +200,9 @@ namespace FolderLocker.Services.Protection
 
                     // No tocar metadatos de FolderLocker
                     if (name.Equals("locker.id", StringComparison.OrdinalIgnoreCase) ||
-                        name.Equals("dir.idx", StringComparison.OrdinalIgnoreCase))
+                        name.Equals("dir.idx", StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals("dir.journal", StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals(".fl_lock_state", StringComparison.OrdinalIgnoreCase))
                     {
                         continue;
                     }

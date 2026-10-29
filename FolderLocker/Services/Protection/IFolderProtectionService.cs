@@ -12,5 +12,6 @@ namespace FolderLocker.Services.Protection
         void CrearMarcador(string path);
         void QuitarMarcador(string path);
         bool EsCarpetaProtegida(string path);
+        InterruptedProtectionInfo DetectInterruptedProtection(string path);
     }
 }

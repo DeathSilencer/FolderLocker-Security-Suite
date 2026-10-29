@@ -9,6 +9,24 @@ namespace FolderLocker.Services.Protection
         public string EstimatedTime { get; set; } = "< 5s";
         public bool IsLargeVolume { get; set; }
         public int IgnoredJunkFiles { get; set; }
+        public int PendingFiles { get; set; }
+        public long PendingBytes { get; set; }
+        public int AlreadyEncryptedFiles { get; set; }
+        public long AlreadyEncryptedBytes { get; set; }
+        public bool HasInterruptedProtection { get; set; }
+    }
+
+    public class InterruptedProtectionInfo
+    {
+        public bool IsInterrupted { get; set; }
+        public string Path { get; set; } = string.Empty;
+        public int EncryptedFilesCount { get; set; }
+        public int PendingFilesCount { get; set; }
+        public long EncryptedBytes { get; set; }
+        public long PendingBytes { get; set; }
+        public bool HasJournal { get; set; }
+        public string? LastUser { get; set; }
+        public DateTime? InterruptedAt { get; set; }
     }
 
     public class ProtectionValidationResult

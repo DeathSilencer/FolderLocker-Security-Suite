@@ -264,5 +264,178 @@ namespace FolderLocker.Tests
                 if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
             }
         }
+
+        [Fact]
+        public void DirectoryMap_Journal_ReplaysEntriesIfIndexNotSaved()
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), "FL_TestJournal_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var crypto = new CryptoService("TestPass123!");
+                var map1 = new DirectoryMap(tempDir, crypto, autoSave: false);
+                var entry = map1.AddEntry("secreto.pdf", false, "secreto.pdf");
+
+                // Escribir solo al journal sin llamar GuardarIndice()
+                map1.AppendJournal(entry);
+
+                // Instanciar nuevo DirectoryMap simulando inicio tras caída
+                var map2 = new DirectoryMap(tempDir, crypto, autoSave: false);
+                var recoveredEntry = map2.GetByPhysicalName(entry.PhysicalName);
+
+                Assert.NotNull(recoveredEntry);
+                Assert.Equal("secreto.pdf", recoveredEntry.RealName);
+                Assert.Equal(entry.PhysicalName, recoveredEntry.PhysicalName);
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void FolderProtectionService_DetectInterruptedProtection_IdentifiesIncompleteLock()
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), "FL_TestDetectInterrupted_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                File.WriteAllText(Path.Combine(tempDir, "pendiente.txt"), "Texto pendiente");
+                File.WriteAllText(Path.Combine(tempDir, "abc123def456.lock"), "Cifrado simulado");
+
+                var service = new FolderProtectionService();
+                var info = service.DetectInterruptedProtection(tempDir);
+
+                Assert.True(info.IsInterrupted);
+                Assert.Equal(1, info.EncryptedFilesCount);
+                Assert.Equal(1, info.PendingFilesCount);
+                Assert.True(info.PendingBytes > 0);
+                Assert.True(info.EncryptedBytes > 0);
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public async System.Threading.Tasks.Task FolderProtectionService_ResumingInterruptedLock_DoesNotReEncryptAlreadyLockedFiles()
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), "FL_TestResumeLock_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                string pass = "MasterSecurePass2026!";
+                var crypto = new CryptoService(pass);
+                var service = new FolderProtectionService();
+
+                // 1. Crear 2 archivos en la carpeta
+                string file1Content = "Contenido original archivo 1";
+                string file2Content = "Contenido original archivo 2";
+                string file1Path = Path.Combine(tempDir, "archivo1.txt");
+                string file2Path = Path.Combine(tempDir, "archivo2.txt");
+                File.WriteAllText(file1Path, file1Content);
+                File.WriteAllText(file2Path, file2Content);
+
+                // 2. Simular que archivo 1 ya fue encriptado previamente antes de una interrupción
+                var map = new DirectoryMap(tempDir, crypto, autoSave: false);
+                var entry1 = map.AddEntry("archivo1.txt", false, "archivo1.txt");
+
+                byte[] file1Bytes = System.Text.Encoding.UTF8.GetBytes(file1Content);
+                crypto.TransformarDatos(file1Bytes, 0, file1Bytes.Length);
+
+                string lock1Path = Path.Combine(tempDir, entry1.PhysicalName);
+                File.WriteAllBytes(lock1Path, file1Bytes);
+                File.Delete(file1Path); // El original ya no existe
+
+                // Guardar la entrada en el journal
+                map.AppendJournal(entry1);
+
+                // Verificar que archivo 1 en disco está cifrado (no texto plano)
+                byte[] rawLockBytes = File.ReadAllBytes(lock1Path);
+                Assert.NotEqual(file1Content, System.Text.Encoding.UTF8.GetString(rawLockBytes));
+
+                // 3. Ejecutar ProtectFolderAsync como si el usuario volviera a proteger/completar la carpeta
+                var progress = new Progress<Tuple<int, string>>(_ => { });
+                await service.ProtectFolderAsync(tempDir, pass, progress);
+
+                // 4. Asegurar que archivo1.lock NO fue re-encriptado dos veces
+                // Si fue re-encriptado dos veces, descifrarlo fallaría. Comprobemos que descifra exactamente a su texto original:
+                byte[] lockBytesAfterSecondRun = File.ReadAllBytes(lock1Path);
+                byte[] decryptedBytes = (byte[])lockBytesAfterSecondRun.Clone();
+                crypto.TransformarDatos(decryptedBytes, 0, decryptedBytes.Length);
+                string decryptedText = System.Text.Encoding.UTF8.GetString(decryptedBytes);
+
+                Assert.Equal(file1Content, decryptedText);
+
+                // 5. Verificar que archivo 2 ahora también está protegido
+                Assert.False(File.Exists(file2Path)); // archivo2.txt en plano fue eliminado
+                var finalMap = new DirectoryMap(tempDir, crypto, autoSave: false);
+                var entry2 = finalMap.GetByRelativePath("archivo2.txt");
+                Assert.NotNull(entry2);
+                Assert.True(File.Exists(Path.Combine(tempDir, entry2.PhysicalName)));
+
+                // 6. Restaurar carpeta completa y comprobar integridad de ambos archivos
+                await service.RestoreFolderAsync(tempDir, pass, progress);
+
+                Assert.True(File.Exists(file1Path));
+                Assert.True(File.Exists(file2Path));
+                Assert.Equal(file1Content, File.ReadAllText(file1Path));
+                Assert.Equal(file2Content, File.ReadAllText(file2Path));
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public async System.Threading.Tasks.Task FolderProtectionService_InterruptedLock_CleansRedundantPlaintextFilesSafely()
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), "FL_TestRedundantClean_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                string pass = "MasterSecurePass2026!";
+                var crypto = new CryptoService(pass);
+                var service = new FolderProtectionService();
+
+                // Simular que un archivo fue cifrado pero la interrupción impidió borrar el original
+                string content = "Informacion Ultra Secreta 2026";
+                string plainPath = Path.Combine(tempDir, "informe.docx");
+                File.WriteAllText(plainPath, content);
+
+                var map = new DirectoryMap(tempDir, crypto, autoSave: false);
+                var entry = map.AddEntry("informe.docx", false, "informe.docx");
+
+                byte[] cipherBytes = System.Text.Encoding.UTF8.GetBytes(content);
+                crypto.TransformarDatos(cipherBytes, 0, cipherBytes.Length);
+
+                string lockPath = Path.Combine(tempDir, entry.PhysicalName);
+                File.WriteAllBytes(lockPath, cipherBytes);
+                map.AppendJournal(entry);
+
+                // Ambos archivos coexisten (plainPath y lockPath)
+                Assert.True(File.Exists(plainPath));
+                Assert.True(File.Exists(lockPath));
+
+                // Reanudar protección
+                var progress = new Progress<Tuple<int, string>>(_ => { });
+                await service.ProtectFolderAsync(tempDir, pass, progress);
+
+                // El archivo en texto plano redundante debe haber sido eliminado limpiamente
+                Assert.False(File.Exists(plainPath));
+                Assert.True(File.Exists(lockPath));
+
+                // Comprobar que el archivo .lock contiene exactamente el cifrado original sin doble cifrado
+                byte[] lockBytes = File.ReadAllBytes(lockPath);
+                crypto.TransformarDatos(lockBytes, 0, lockBytes.Length);
+                Assert.Equal(content, System.Text.Encoding.UTF8.GetString(lockBytes));
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+        }
     }
 }

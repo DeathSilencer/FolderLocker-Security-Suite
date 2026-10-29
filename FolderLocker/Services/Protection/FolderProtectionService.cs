@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FolderLocker;
 using FolderLocker.Services.Audit;
 using FolderLocker.Services.VirtualDisk;
@@ -6,6 +7,109 @@ namespace FolderLocker.Services.Protection
 {
     public class FolderProtectionService : IFolderProtectionService
     {
+        private const string LockStateFileName = ".fl_lock_state";
+
+        public InterruptedProtectionInfo DetectInterruptedProtection(string path)
+        {
+            var info = new InterruptedProtectionInfo { Path = path };
+            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+            {
+                return info;
+            }
+
+            try
+            {
+                string statePath = Path.Combine(path, LockStateFileName);
+                string journalPath = Path.Combine(path, "dir.journal");
+                string idxPath = Path.Combine(path, "dir.idx");
+                string markerPath = Path.Combine(path, "locker.id");
+
+                bool hasState = File.Exists(statePath);
+                bool hasJournal = File.Exists(journalPath);
+                bool hasIdx = File.Exists(idxPath);
+                bool hasMarker = File.Exists(markerPath);
+
+                info.HasJournal = hasJournal;
+
+                if (hasState)
+                {
+                    try
+                    {
+                        string json = File.ReadAllText(statePath);
+                        using var doc = JsonDocument.Parse(json);
+                        if (doc.RootElement.TryGetProperty("Username", out var userProp))
+                        {
+                            info.LastUser = userProp.GetString();
+                        }
+                        if (doc.RootElement.TryGetProperty("StartTime", out var timeProp) &&
+                            timeProp.TryGetDateTime(out var dt))
+                        {
+                            info.InterruptedAt = dt;
+                        }
+                    }
+                    catch { }
+                }
+
+                int encryptedCount = 0;
+                long encryptedBytes = 0;
+                int pendingCount = 0;
+                long pendingBytes = 0;
+
+                var allFiles = Directory.EnumerateFiles(path, "*.*", SearchOption.AllDirectories);
+                foreach (var f in allFiles)
+                {
+                    if (JunkFileFilter.IsJunkOrTemporaryFile(f)) continue;
+
+                    string name = Path.GetFileName(f);
+                    if (name.Equals("locker.id", StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals("dir.idx", StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals("dir.journal", StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals(LockStateFileName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    long len = 0;
+                    try { len = new FileInfo(f).Length; } catch { }
+
+                    if (name.EndsWith(".lock", StringComparison.OrdinalIgnoreCase))
+                    {
+                        encryptedCount++;
+                        encryptedBytes += len;
+                    }
+                    else
+                    {
+                        pendingCount++;
+                        pendingBytes += len;
+                    }
+                }
+
+                info.EncryptedFilesCount = encryptedCount;
+                info.EncryptedBytes = encryptedBytes;
+                info.PendingFilesCount = pendingCount;
+                info.PendingBytes = pendingBytes;
+
+                // Se considera interrumpida si:
+                // 1. Existe el archivo de estado de bloqueo en progreso .fl_lock_state, O
+                // 2. Existe dir.journal sin terminar, O
+                // 3. No tiene locker.id (no finalizó), pero ya contiene archivos .lock o dir.idx
+                if (!hasMarker && (hasState || hasJournal || (encryptedCount > 0 && (pendingCount > 0 || hasIdx))))
+                {
+                    info.IsInterrupted = true;
+                }
+                else if (hasState && !hasMarker)
+                {
+                    info.IsInterrupted = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                SecurityAuditLogger.LogError("INTERRUPTED_CHECK_ERROR", $"Error al verificar interrupción en '{path}': {ex.Message}", ex, path);
+            }
+
+            return info;
+        }
+
         public FolderScanResult ScanFolder(string path)
         {
             var result = new FolderScanResult { Path = path };
@@ -17,6 +121,13 @@ namespace FolderLocker.Services.Protection
 
             try
             {
+                var interrupted = DetectInterruptedProtection(path);
+                result.HasInterruptedProtection = interrupted.IsInterrupted;
+                result.AlreadyEncryptedFiles = interrupted.EncryptedFilesCount;
+                result.AlreadyEncryptedBytes = interrupted.EncryptedBytes;
+                result.PendingFiles = interrupted.PendingFilesCount;
+                result.PendingBytes = interrupted.PendingBytes;
+
                 var files = Directory.EnumerateFiles(path, "*.*", SearchOption.AllDirectories);
                 int count = 0;
                 long bytes = 0;
@@ -27,6 +138,15 @@ namespace FolderLocker.Services.Protection
                     if (JunkFileFilter.IsJunkOrTemporaryFile(f))
                     {
                         junkCount++;
+                        continue;
+                    }
+
+                    string name = Path.GetFileName(f);
+                    if (name.Equals("locker.id", StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals("dir.idx", StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals("dir.journal", StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals(LockStateFileName, StringComparison.OrdinalIgnoreCase))
+                    {
                         continue;
                     }
 
@@ -42,7 +162,11 @@ namespace FolderLocker.Services.Protection
                 result.TotalBytes = bytes;
                 result.IgnoredJunkFiles = junkCount;
                 result.FormattedSize = FormatearTamano(bytes);
-                result.EstimatedTime = EstimarTiempo(count, bytes);
+
+                // El tiempo estimado se calcula con los bytes pendientes reales
+                long bytesParaEstimacion = interrupted.IsInterrupted ? interrupted.PendingBytes : bytes;
+                int archivosParaEstimacion = interrupted.IsInterrupted ? interrupted.PendingFilesCount : count;
+                result.EstimatedTime = EstimarTiempo(archivosParaEstimacion, bytesParaEstimacion);
                 result.IsLargeVolume = count >= 500 || bytes >= 500L * 1024 * 1024;
             }
             catch (Exception ex)
@@ -91,7 +215,7 @@ namespace FolderLocker.Services.Protection
                 return ProtectionValidationResult.Fail(msgPermiso, isCritical: true);
             }
 
-            // Validar espacio libre en disco (tamaño de la carpeta + 50 MB de margen de seguridad)
+            // Validar espacio libre en disco (tamaño de los archivos pendientes + 50 MB de margen de seguridad)
             try
             {
                 var scan = ScanFolder(rNorm);
@@ -99,7 +223,8 @@ namespace FolderLocker.Services.Protection
                 if (!string.IsNullOrEmpty(root))
                 {
                     var drive = new DriveInfo(root);
-                    long espacioRequerido = scan.TotalBytes + (50L * 1024 * 1024);
+                    long bytesCalculo = scan.HasInterruptedProtection ? scan.PendingBytes : scan.TotalBytes;
+                    long espacioRequerido = bytesCalculo + (50L * 1024 * 1024);
                     if (drive.AvailableFreeSpace < espacioRequerido)
                     {
                         string msgEspacio = string.Format(Localization.Get("err_insufficient_disk_space"), FormatearTamano(espacioRequerido), FormatearTamano(drive.AvailableFreeSpace), root);
@@ -133,7 +258,19 @@ namespace FolderLocker.Services.Protection
 
         public async System.Threading.Tasks.Task ProtectFolderAsync(string path, string password, IProgress<Tuple<int, string>> progress, System.Threading.ManualResetEventSlim? pauseEvent = null, CancellationToken ct = default)
         {
-            SecurityAuditLogger.LogSecurity("ENCRYPT_START", "Inicio de Cifrado Atómico", true, "Iniciando cifrado con Two-Phase Commit", path);
+            var interrupcion = DetectInterruptedProtection(path);
+            if (interrupcion.IsInterrupted)
+            {
+                SecurityAuditLogger.LogSecurity("ENCRYPT_RESUME", "Reanudación de Cifrado Interrumpido", true,
+                    $"Reanudando cifrado tras interrupción forzada. Archivos ya protegidos: {interrupcion.EncryptedFilesCount}, Pendientes: {interrupcion.PendingFilesCount}", path);
+            }
+            else
+            {
+                SecurityAuditLogger.LogSecurity("ENCRYPT_START", "Inicio de Cifrado Atómico", true, "Iniciando cifrado con Two-Phase Commit", path);
+            }
+
+            // Registrar estado de operación en progreso para detección de caídas/cortes
+            CrearEstadoOperacion(path);
 
             // Saneamiento preventivo de archivos basura o temporales no bloqueados
             int saneados = JunkFileFilter.CleanTemporaryFiles(path);
@@ -142,9 +279,18 @@ namespace FolderLocker.Services.Protection
                 SecurityAuditLogger.LogInfo("ENCRYPT_PRE_CLEANUP", $"Se limpiaron {saneados} archivos temporales/basura antes del cifrado.", path);
             }
 
-            await ProcesarArchivosMotorAsync(path, password, esEncriptar: true, progress, pauseEvent, ct);
-            CrearMarcador(path);
-            SecurityAuditLogger.LogSecurity("ENCRYPT_SUCCESS", "Cifrado Completado", true, "Carpeta protegida exitosamente con Two-Phase Commit", path);
+            try
+            {
+                await ProcesarArchivosMotorAsync(path, password, esEncriptar: true, progress, pauseEvent, ct);
+                CrearMarcador(path);
+                EliminarEstadoOperacion(path);
+                SecurityAuditLogger.LogSecurity("ENCRYPT_SUCCESS", "Cifrado Completado", true, "Carpeta protegida exitosamente con Two-Phase Commit", path);
+            }
+            catch
+            {
+                // En caso de excepción/cancelación se conserva el estado para poder reanudar
+                throw;
+            }
         }
 
         public async System.Threading.Tasks.Task RestoreFolderAsync(string path, string password, IProgress<Tuple<int, string>> progress, System.Threading.ManualResetEventSlim? pauseEvent = null, CancellationToken ct = default)
@@ -180,6 +326,8 @@ namespace FolderLocker.Services.Protection
             {
                 EliminarArchivoSeguro(Path.Combine(path, "locker.id"));
                 EliminarArchivoSeguro(Path.Combine(path, "dir.idx"));
+                EliminarArchivoSeguro(Path.Combine(path, "dir.journal"));
+                EliminarArchivoSeguro(Path.Combine(path, LockStateFileName));
 
                 var di = new DirectoryInfo(path);
                 di.Attributes &= ~FileAttributes.Hidden;
@@ -189,6 +337,36 @@ namespace FolderLocker.Services.Protection
             {
                 SecurityAuditLogger.LogWarning("MARKER_REMOVE_WARN", $"No se pudo quitar atributos de ocultación: {ex.Message}", path);
             }
+        }
+
+        private static void CrearEstadoOperacion(string path)
+        {
+            try
+            {
+                string statePath = Path.Combine(path, LockStateFileName);
+                string user = UserManager.CurrentUser?.Username ?? "DEFAULT";
+                var stateObj = new
+                {
+                    Version = "5.2",
+                    Status = "Encrypting",
+                    Username = user,
+                    StartTime = DateTime.Now,
+                    TargetPath = path
+                };
+                string json = JsonSerializer.Serialize(stateObj);
+                File.WriteAllText(statePath, json);
+                File.SetAttributes(statePath, FileAttributes.Hidden | FileAttributes.System);
+            }
+            catch { }
+        }
+
+        private static void EliminarEstadoOperacion(string path)
+        {
+            try
+            {
+                EliminarArchivoSeguro(Path.Combine(path, LockStateFileName));
+            }
+            catch { }
         }
 
         public bool EsCarpetaProtegida(string path)
@@ -221,14 +399,22 @@ namespace FolderLocker.Services.Protection
                 foreach (var f in archivos)
                 {
                     if (JunkFileFilter.IsJunkOrTemporaryFile(f)) continue;
+                    string name = Path.GetFileName(f);
+                    if (name.Equals("locker.id", StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals("dir.idx", StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals("dir.journal", StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals(LockStateFileName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
                     try { totalBytes += new FileInfo(f).Length; } catch { }
                 }
                 if (totalBytes == 0) totalBytes = 1;
 
                 long bytesProcesadosTotal = 0;
-                var archivosOriginalesABorrar = new List<string>();
                 int archivosEnLote = 0;
-                const int LotePuntoDeControl = 500;
+                const int LotePuntoDeControl = 20;
 
                 const int BufferSize = 128 * 1024;
                 byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(BufferSize);
@@ -255,6 +441,15 @@ namespace FolderLocker.Services.Protection
                         string nombreArchivoFisico = Path.GetFileName(archivoPath);
                         string nombreLow = nombreArchivoFisico.ToLowerInvariant();
 
+                        // Omitir archivos de metadatos internos
+                        if (nombreLow.Equals("locker.id") ||
+                            nombreLow.Equals("dir.idx") ||
+                            nombreLow.Equals("dir.journal") ||
+                            nombreLow.Equals(LockStateFileName.ToLowerInvariant()))
+                        {
+                            continue;
+                        }
+
                         // Omitir o limpiar archivos basura o temporales
                         if (JunkFileFilter.IsJunkOrTemporaryFile(archivoPath))
                         {
@@ -273,11 +468,51 @@ namespace FolderLocker.Services.Protection
 
                             if (esEncriptar)
                             {
-                                entry = mapa.GetByPhysicalName(nombreArchivoFisico);
-                                if (entry != null) { bytesProcesadosTotal += new FileInfo(archivoPath).Length; continue; }
+                                // A. ¿El archivo ya es un archivo encriptado (.lock)?
+                                if (nombreArchivoFisico.EndsWith(".lock", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    entry = mapa.GetByPhysicalName(nombreArchivoFisico);
+                                    if (entry != null)
+                                    {
+                                        bytesProcesadosTotal += new FileInfo(archivoPath).Length;
+                                        continue;
+                                    }
+                                    else
+                                    {
+                                        // Archivo con extensión .lock no indexado previamente (ej. interrupción legacy).
+                                        // ¡NUNCA RE-ENCRIPTAR! Se omite para garantizar que no se destruyan datos.
+                                        SecurityAuditLogger.LogWarning("ENCRYPT_SKIP_LOCK", $"Se omitió '{nombreArchivoFisico}' para prevenir doble cifrado y corrupción de datos.", rutaBase);
+                                        bytesProcesadosTotal += new FileInfo(archivoPath).Length;
+                                        continue;
+                                    }
+                                }
 
+                                // B. Archivo en texto plano: verificar si ya existe en catálogo
                                 entry = mapa.GetByRelativePath(rutaRelativa);
-                                if (entry == null) entry = mapa.AddEntry(nombreArchivoFisico, false, rutaRelativa);
+                                if (entry != null)
+                                {
+                                    string rutaLockExistente = Path.Combine(Path.GetDirectoryName(archivoPath)!, entry.PhysicalName);
+                                    if (File.Exists(rutaLockExistente) && new FileInfo(rutaLockExistente).Length > 0)
+                                    {
+                                        // Este archivo ya fue cifrado con éxito en una corrida previa interrumpida.
+                                        // El archivo original en texto plano quedó pendiente de borrado al ocurrir el cierre.
+                                        try
+                                        {
+                                            File.Delete(archivoPath);
+                                            SecurityAuditLogger.LogInfo("ENCRYPT_CLEANUP_ORIGINAL", $"Limpiado original redundante tras interrupción: '{rutaRelativa}' ya que '{entry.PhysicalName}' existe y está protegido.", rutaBase);
+                                        }
+                                        catch { }
+
+                                        bytesProcesadosTotal += new FileInfo(rutaLockExistente).Length;
+                                        continue;
+                                    }
+                                }
+
+                                // C. Si no existía en el mapa, registrar nueva entrada
+                                if (entry == null)
+                                {
+                                    entry = mapa.AddEntry(nombreArchivoFisico, false, rutaRelativa);
+                                }
                             }
                             else
                             {
@@ -346,14 +581,24 @@ namespace FolderLocker.Services.Protection
 
                             File.Move(rutaTemp, rutaFinal);
 
-                            if (rutaFinal != archivoPath)
+                            if (esEncriptar && entry != null)
                             {
-                                archivosOriginalesABorrar.Add(archivoPath);
-                            }
+                                // Resguardo atómico inmediato en WAL Journal
+                                mapa.AppendJournal(entry);
 
-                            if (!esEncriptar && entry != null)
+                                // Limpieza inmediata del archivo original para evitar duplicados en disco
+                                if (rutaFinal != archivoPath && File.Exists(archivoPath))
+                                {
+                                    try { File.Delete(archivoPath); } catch { }
+                                }
+                            }
+                            else if (!esEncriptar && entry != null)
                             {
                                 mapa.RemoveEntryByPhysical(entry.PhysicalName);
+                                if (rutaFinal != archivoPath && File.Exists(archivoPath))
+                                {
+                                    try { File.Delete(archivoPath); } catch { }
+                                }
                             }
 
                             archivosEnLote++;
@@ -361,12 +606,6 @@ namespace FolderLocker.Services.Protection
                             if (archivosEnLote >= LotePuntoDeControl)
                             {
                                 mapa.GuardarIndice();
-
-                                foreach (var f in archivosOriginalesABorrar)
-                                {
-                                    try { if (File.Exists(f)) File.Delete(f); } catch { }
-                                }
-                                archivosOriginalesABorrar.Clear();
                                 archivosEnLote = 0;
                             }
                         }
@@ -379,16 +618,12 @@ namespace FolderLocker.Services.Protection
 
                     mapa.GuardarIndice();
 
-                    foreach (var f in archivosOriginalesABorrar)
-                    {
-                        try { if (File.Exists(f)) File.Delete(f); } catch { }
-                    }
-                    archivosOriginalesABorrar.Clear();
-
                     if (!esEncriptar && mapa.GetAll().Count == 0)
                     {
                         EliminarArchivoSeguro(Path.Combine(rutaBase, "dir.idx"));
+                        EliminarArchivoSeguro(Path.Combine(rutaBase, "dir.journal"));
                         EliminarArchivoSeguro(Path.Combine(rutaBase, "locker.id"));
+                        EliminarArchivoSeguro(Path.Combine(rutaBase, LockStateFileName));
                     }
 
                     progreso.Report(Tuple.Create(100, Localization.Get("status_done") ?? "Completado"));

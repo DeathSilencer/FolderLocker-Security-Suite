@@ -114,12 +114,16 @@ namespace FolderLocker
             string tamanoTexto,
             string tiempoEstimado,
             bool esVolumenGrande,
-            int archivosJunkExcluidos = 0)
+            int archivosJunkExcluidos = 0,
+            int archivosYaProtegidos = 0,
+            int archivosPendientes = 0,
+            bool esReanudacion = false)
         {
-            int extraH = archivosJunkExcluidos > 0 ? 20 : 0;
+            bool hayReanudacion = esReanudacion && archivosYaProtegidos > 0;
+            int extraH = (archivosJunkExcluidos > 0 ? 20 : 0) + (hayReanudacion ? 35 : 0);
             int w = 530;
             int h = (esVolumenGrande ? 465 : 445) + extraH;
-            string titulo = Localization.Get(esVolumenGrande ? "prescan_title_warning" : "prescan_title_summary");
+            string titulo = Localization.Get(hayReanudacion ? "prescan_title_resume" : (esVolumenGrande ? "prescan_title_warning" : "prescan_title_summary"));
 
             using var form = CrearBase(titulo, w, h);
 
@@ -155,7 +159,7 @@ namespace FolderLocker
 
             var lblFolderIcon = new Label
             {
-                Text = "📁",
+                Text = hayReanudacion ? "⚡" : "📁",
                 Font = new Font("Segoe UI", 14),
                 Location = new Point(12, 12),
                 Size = new Size(30, 30),
@@ -196,25 +200,48 @@ namespace FolderLocker
             // KPI 1: Archivos
             var pnlKpi1 = new Panel { Location = new Point(25, cardY), Size = new Size(cardW, cardH), BackColor = Color.FromArgb(28, 25, 25) };
             pnlKpi1.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlKpi1.ClientRectangle, Color.FromArgb(50, 44, 44), ButtonBorderStyle.Solid);
+            
+            string tagKpi1 = hayReanudacion
+                ? "📄 " + (Localization.Get("prescan_lbl_pending") ?? "PENDIENTES")
+                : "📄 " + Localization.Get("prescan_lbl_files");
+            string valKpi1 = hayReanudacion
+                ? $"{archivosPendientes:N0}"
+                : $"{totalArchivos:N0}";
+
             var lblKpi1Tag = new Label
             {
-                Text = "📄 " + Localization.Get("prescan_lbl_files"),
+                Text = tagKpi1,
                 Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(160, 150, 150),
+                ForeColor = hayReanudacion ? Color.FromArgb(251, 191, 36) : Color.FromArgb(160, 150, 150),
                 Location = new Point(10, 8),
                 AutoSize = true,
                 BackColor = Color.Transparent
             };
             var lblKpi1Val = new Label
             {
-                Text = $"{totalArchivos:N0}",
+                Text = valKpi1,
                 Font = new Font("Segoe UI Black", 13, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(10, 28),
+                Location = new Point(10, 26),
                 AutoSize = true,
                 BackColor = Color.Transparent
             };
             pnlKpi1.Controls.AddRange(new Control[] { lblKpi1Tag, lblKpi1Val });
+
+            if (hayReanudacion)
+            {
+                var lblKpi1Sub = new Label
+                {
+                    Text = $"({archivosYaProtegidos:N0} " + (Localization.Get("prescan_lbl_encrypted") ?? "OK") + ")",
+                    Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(52, 211, 153),
+                    Location = new Point(10, 50),
+                    AutoSize = true,
+                    BackColor = Color.Transparent
+                };
+                pnlKpi1.Controls.Add(lblKpi1Sub);
+            }
+
             form.Controls.Add(pnlKpi1);
 
             // KPI 2: Tamaño
@@ -269,13 +296,36 @@ namespace FolderLocker
             // 3. Banner de Seguridad o Advertencia
             int bannerY = 200;
             int bannerH = (esVolumenGrande ? 76 : 62) + extraH;
+
+            Color borderAccent;
+            Color bannerBg;
+            Color bannerFg;
+
+            if (hayReanudacion)
+            {
+                bannerBg = Color.FromArgb(42, 34, 16);
+                borderAccent = Color.FromArgb(234, 179, 8);
+                bannerFg = Color.FromArgb(254, 240, 138);
+            }
+            else if (esVolumenGrande)
+            {
+                bannerBg = Color.FromArgb(42, 20, 20);
+                borderAccent = Theme.AccentRed;
+                bannerFg = Color.FromArgb(254, 202, 202);
+            }
+            else
+            {
+                bannerBg = Color.FromArgb(20, 34, 25);
+                borderAccent = Color.FromArgb(16, 185, 129);
+                bannerFg = Color.FromArgb(167, 243, 208);
+            }
+
             var pnlBanner = new Panel
             {
                 Location = new Point(25, bannerY),
                 Size = new Size(480, bannerH),
-                BackColor = esVolumenGrande ? Color.FromArgb(42, 20, 20) : Color.FromArgb(20, 34, 25)
+                BackColor = bannerBg
             };
-            Color borderAccent = esVolumenGrande ? Theme.AccentRed : Color.FromArgb(16, 185, 129);
             pnlBanner.Paint += (s, e) =>
             {
                 ControlPaint.DrawBorder(e.Graphics, pnlBanner.ClientRectangle, Color.FromArgb(50, 44, 44), ButtonBorderStyle.Solid);
@@ -283,7 +333,15 @@ namespace FolderLocker
                 e.Graphics.FillRectangle(b, 0, 0, 4, pnlBanner.Height);
             };
 
-            string textoBanner = Localization.Get(esVolumenGrande ? "prescan_large_warning" : "prescan_normal_summary");
+            string textoBanner;
+            if (hayReanudacion)
+            {
+                textoBanner = string.Format(Localization.Get("prescan_resume_detected") ?? "⚡ Interrupción detectada: Se reanudará desde donde se quedó. {0:N0} archivo(s) ya protegido(s) NO se volverán a encriptar; se procesarán los {1:N0} pendiente(s).", archivosYaProtegidos, archivosPendientes);
+            }
+            else
+            {
+                textoBanner = Localization.Get(esVolumenGrande ? "prescan_large_warning" : "prescan_normal_summary");
+            }
 
             if (archivosJunkExcluidos > 0)
             {
@@ -295,7 +353,7 @@ namespace FolderLocker
             {
                 Text = textoBanner,
                 Font = new Font("Segoe UI", 8.5f),
-                ForeColor = esVolumenGrande ? Color.FromArgb(254, 202, 202) : Color.FromArgb(167, 243, 208),
+                ForeColor = bannerFg,
                 Location = new Point(16, 10),
                 Size = new Size(450, bannerH - 20),
                 BackColor = Color.Transparent
@@ -321,18 +379,18 @@ namespace FolderLocker
             int btnY = promptY + 30;
             var btnSi = new Button
             {
-                Text = Localization.Get("prescan_btn_proceed"),
+                Text = hayReanudacion ? (Localization.Get("prescan_btn_resume") ?? "⚡ REANUDAR BLOQUEO") : Localization.Get("prescan_btn_proceed"),
                 Location = new Point(25, btnY),
                 Size = new Size(250, 45),
                 FlatStyle = FlatStyle.Flat,
-                BackColor = Theme.AccentRed,
+                BackColor = hayReanudacion ? Color.FromArgb(194, 65, 12) : Theme.AccentRed,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 Cursor = Cursors.Hand,
                 DialogResult = DialogResult.Yes
             };
             btnSi.FlatAppearance.BorderSize = 0;
-            btnSi.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 38, 38);
+            btnSi.FlatAppearance.MouseOverBackColor = hayReanudacion ? Color.FromArgb(217, 119, 6) : Color.FromArgb(220, 38, 38);
 
             var btnNo = new Button
             {

@@ -166,6 +166,25 @@ namespace FolderLocker
             _inactivityService.ResetTimer();
             SecurityAuditLogger.LogSecurity("USER_LOGIN", "Inicio de Sesión", true, $"Usuario '{user.Username}' autenticado correctamente.");
             DarkDialogs.ShowInfo(string.Format(Localization.Get("login_welcome"), user.Username), Localization.Get("title_welcome"), this);
+
+            // Detección proactiva de carpetas con bloqueo interrumpido por caída previa
+            try
+            {
+                foreach (var folder in user.LockedFolders)
+                {
+                    var interrupcion = _protectionService.DetectInterruptedProtection(folder);
+                    if (interrupcion.IsInterrupted)
+                    {
+                        string nombreCarpeta = Path.GetFileName(folder);
+                        string msgInterrupcion = string.Format(
+                            Localization.Get("login_interrupted_warning") ?? "Se detectó que la carpeta '{0}' tiene un bloqueo incompleto tras una interrupción o cierre forzado previo. Puedes continuar el bloqueo en 'Proteger' o restaurarla sin riesgo de pérdida de datos.",
+                            nombreCarpeta);
+                        DarkDialogs.ShowInfo(msgInterrupcion, Localization.Get("title_warning"), this);
+                        break;
+                    }
+                }
+            }
+            catch { }
         }
 
         #endregion
@@ -210,8 +229,18 @@ namespace FolderLocker
                 return;
             }
 
-            // 4. Confirmación visual con KPIs
-            if (DarkDialogs.ShowPreScanSummary(this, ruta, scan.TotalFiles, scan.FormattedSize, scan.EstimatedTime, scan.IsLargeVolume, scan.IgnoredJunkFiles) != DialogResult.Yes)
+            // 4. Confirmación visual con KPIs y detección de reanudación
+            if (DarkDialogs.ShowPreScanSummary(
+                this, 
+                ruta, 
+                scan.TotalFiles, 
+                scan.FormattedSize, 
+                scan.EstimatedTime, 
+                scan.IsLargeVolume, 
+                scan.IgnoredJunkFiles,
+                scan.AlreadyEncryptedFiles,
+                scan.PendingFiles,
+                scan.HasInterruptedProtection) != DialogResult.Yes)
             {
                 return;
             }
